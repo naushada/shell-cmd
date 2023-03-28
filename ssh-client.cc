@@ -9,6 +9,7 @@
 #include <array>
 #include <iostream>
 #include <cstdio>
+#include <sstream>
 
 int main(std::int32_t argc, char *argv[]) {
 
@@ -86,15 +87,20 @@ int main(std::int32_t argc, char *argv[]) {
             //std::cin >> line;
             //char data[1024];
             //std::cin.get(line.data(), 1024);
-            std::array<char, 2048> cmd;
-            cmd.fill(0);
-            std::cin.getline(cmd.data(), 2048);
+            //std::array<char, 2048> cmd("eval ");
+            //cmd.fill(0);
+            std::string cmd("eval ");
+            std::cin.getline((cmd.data() + 5), '\n');
+            //std::string eval("eval ");
+            //eval += cmd.data();
             //std::cout << "cmd.data() " << cmd.data() << std::endl;
-            std::int32_t len = write(wrFd[1], reinterpret_cast<const char *>(cmd.data()), std::cin.gcount());
+            std::stringstream ss;
+            ss << "`" << cmd.data() << "`";
+            std::int32_t len = write(wrFd[1], reinterpret_cast<const char *>(ss.str().c_str()), /*std::cin.gcount()*/ss.str().length());
             if(len <= 0) {
                 std::cout << "Failed to send Command to executable " << std::endl;
             } else {
-                std::cout << "Command sent to Executable successfully command: \'" << cmd.data() << "\' length: " << strlen(cmd.data()) << std::endl;
+                std::cout << "Command sent to Executable successfully command: " << ss.str().c_str() << " length: " << ss.str().length() << std::endl;
             }
 
             std::array<char, 1024> arr;
@@ -104,7 +110,7 @@ int main(std::int32_t argc, char *argv[]) {
                 std::string data(arr.data(), len);
                 std::cout << "The Command output is " << data.c_str() <<std::endl;
             } else {
-                //std::cout << "read is failed " << std::endl;
+                std::cout << "read is failed " << std::endl;
             }
         }
     } else {
