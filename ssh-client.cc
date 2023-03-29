@@ -49,7 +49,7 @@ int main(std::int32_t argc, char *argv[]) {
 
         //char *const args[] = {"/usr/bin/sh",NULL};
         char *args[] = {"sh", NULL};
-        if(execlp("/usr/bin/sh", "/usr/bin/sh", NULL) < 0) {
+        if(execlp("/usr/bin/sh", "/usr/bin/sh", "-e", NULL) < 0) {
             std::cout << "spawning of/usr/bin/sh processis failed" << std::endl;
             exit(0);
         }
@@ -100,7 +100,8 @@ int main(std::int32_t argc, char *argv[]) {
             std::string cmd;
             std::getline(std::cin, cmd);
             std::stringstream ss;
-            ss << "echo " << cmd.data();;
+            //ss << "echo " << cmd.data();;
+            ss << cmd.data() << "\n";
             std::int32_t len = write(wrFd[1], reinterpret_cast<const char *>(ss.str().c_str()), /*std::cin.gcount()*/ss.str().length());
             if(len <= 0) {
                 std::cout << "Failed to send Command to executable " << std::endl;
