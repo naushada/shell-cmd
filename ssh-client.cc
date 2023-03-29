@@ -91,26 +91,14 @@ int main(std::int32_t argc, char *argv[]) {
             }
         };
         std::thread reception(entryFn, rdFd[0]);
-        
 
         while(true) {
-            //std::string line("");
-            //std::iostream line;
             std::cout <<std::endl;
             std::cout << "Enter Command now " << std::endl;
             std::cout << "I am inside Child Process" << std::endl;
 
-            //std::cin >> line;
-            //char data[1024];
-            //std::cin.get(line.data(), 1024);
-            //std::array<char, 2048> cmd("eval ");
-            //cmd.fill(0);
             std::string cmd;
-            //std::cin.getline((cmd.data() + 5), '\n');
             std::getline(std::cin, cmd);
-            //std::string eval("eval ");
-            //eval += cmd.data();
-            //std::cout << "cmd.data() " << cmd.data() << std::endl;
             std::stringstream ss;
             ss << "echo " << cmd.data();;
             std::int32_t len = write(wrFd[1], reinterpret_cast<const char *>(ss.str().c_str()), /*std::cin.gcount()*/ss.str().length());
