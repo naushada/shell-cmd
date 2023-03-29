@@ -10,6 +10,7 @@
 #include <iostream>
 #include <cstdio>
 #include <sstream>
+#include <thread>
 
 int main(std::int32_t argc, char *argv[]) {
 
@@ -48,7 +49,7 @@ int main(std::int32_t argc, char *argv[]) {
 
         //char *const args[] = {"/usr/bin/sh",NULL};
         char *args[] = {"sh", NULL};
-        if(execlp(sh.c_str(), "/usr/bin/sh","-svn", NULL) < 0) {
+        if(execlp("/usr/bin/sh", "/usr/bin/sh", NULL) < 0) {
             std::cout << "spawning of/usr/bin/sh processis failed" << std::endl;
             exit(0);
         }
@@ -77,6 +78,21 @@ int main(std::int32_t argc, char *argv[]) {
         fds.push_back(reinterpret_cast<std::array<std::int32_t, 2>&>(rdFd));
         fds.push_back(reinterpret_cast<std::array<std::int32_t, 2>&>(wrFd));
 
+        auto entryFn = [](auto channel) {
+            std::array<char, 1024> arr;
+            arr.fill(0);
+            std::cout << "Reception thread " << std::endl;
+            auto len = read(channel, arr.data(), arr.size());
+            if(len > 0) {
+                std::string data(arr.data(), len);
+                std::cout << "The Command output is " << data.c_str() <<std::endl;
+            } else {
+                //std::cout << "read is failed " << std::endl;
+            }
+        };
+        std::thread reception(entryFn, rdFd[0]);
+        
+
         while(true) {
             //std::string line("");
             //std::iostream line;
@@ -89,30 +105,24 @@ int main(std::int32_t argc, char *argv[]) {
             //std::cin.get(line.data(), 1024);
             //std::array<char, 2048> cmd("eval ");
             //cmd.fill(0);
-            std::string cmd("eval ");
-            std::cin.getline((cmd.data() + 5), '\n');
+            std::string cmd;
+            //std::cin.getline((cmd.data() + 5), '\n');
+            std::getline(std::cin, cmd);
             //std::string eval("eval ");
             //eval += cmd.data();
             //std::cout << "cmd.data() " << cmd.data() << std::endl;
             std::stringstream ss;
-            ss << "`" << cmd.data() << "`";
+            ss << "echo " << cmd.data();;
             std::int32_t len = write(wrFd[1], reinterpret_cast<const char *>(ss.str().c_str()), /*std::cin.gcount()*/ss.str().length());
             if(len <= 0) {
                 std::cout << "Failed to send Command to executable " << std::endl;
+                exit(0);
             } else {
                 std::cout << "Command sent to Executable successfully command: " << ss.str().c_str() << " length: " << ss.str().length() << std::endl;
             }
-
-            std::array<char, 1024> arr;
-            arr.fill(0);
-            len = read(rdFd[0], arr.data(), arr.size());
-            if(len > 0) {
-                std::string data(arr.data(), len);
-                std::cout << "The Command output is " << data.c_str() <<std::endl;
-            } else {
-                std::cout << "read is failed " << std::endl;
-            }
         }
+        reception.join();
+
     } else {
         //error 
         std::cout << " fork failed " << std::endl;
