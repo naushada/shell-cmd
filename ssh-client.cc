@@ -49,7 +49,7 @@ int main(std::int32_t argc, char *argv[]) {
 
         //char *const args[] = {"/usr/bin/sh",NULL};
         char *args[] = {"sh", NULL};
-        if(execlp("/usr/bin/sh", "/usr/bin/sh", "-e", NULL) < 0) {
+        if(execlp("/usr/bin/sh", "/usr/bin/sh", NULL) < 0) {
             std::cout << "spawning of/usr/bin/sh processis failed" << std::endl;
             exit(0);
         }
