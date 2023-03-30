@@ -78,19 +78,46 @@ int main(std::int32_t argc, char *argv[]) {
         fds.push_back(reinterpret_cast<std::array<std::int32_t, 2>&>(rdFd));
         fds.push_back(reinterpret_cast<std::array<std::int32_t, 2>&>(wrFd));
 
-        auto entryFn = [](auto channel) {
+        auto receptionFn = [](auto channel) {
             std::array<char, 1024> arr;
-            arr.fill(0);
+            std::vector<std::array<char, 1024>> response;
+            ssize_t len = -1;
+            fd_set fdset;
+
             std::cout << "Reception thread " << std::endl;
-            auto len = read(channel, arr.data(), arr.size());
-            if(len > 0) {
-                std::string data(arr.data(), len);
-                std::cout << "The Command output is " << data.c_str() <<std::endl;
+            response.clear();
+            FD_ZERO(&fdset);
+
+            do {
+                arr.fill(0);
+                FD_SET(channel, &fdset);
+                struct timeval to = {0,0};
+                auto ret = select((channel + 1), &fdset, NULL, NULL, &to);
+
+                if(ret <= 0) {
+                    break;
+                }
+
+                if(FD_ISSET(channel, &fdset)) {
+                    len = read(channel, (void *)arr.data(), (size_t)arr.size());
+
+                    if(len > 0) {
+                        std::cout << "Pushing into vector " << std::endl;
+                        response.push_back(arr);
+                    }
+                }
+            } while(true);
+
+            if(response.size()) {
+                for(auto const &elm: response) {
+                    std::string data(reinterpret_cast<const char *>(elm.data()), elm.size());
+                    std::cout << "The Command output is ====>>>>> " << data.c_str() <<std::endl;
+                }
             } else {
                 //std::cout << "read is failed " << std::endl;
             }
         };
-        std::thread reception(entryFn, rdFd[0]);
+        //std::thread reception(entryFn, rdFd[0]);
 
         while(true) {
             std::cout <<std::endl;
@@ -108,9 +135,10 @@ int main(std::int32_t argc, char *argv[]) {
                 exit(0);
             } else {
                 std::cout << "Command sent to Executable successfully command: " << ss.str().c_str() << " length: " << ss.str().length() << std::endl;
+                receptionFn(rdFd[0]);
             }
         }
-        reception.join();
+        //reception.join();
 
     } else {
         //error 
