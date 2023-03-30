@@ -38,32 +38,18 @@ int main(std::int32_t argc, char *argv[]) {
         close(wrFd[1]);
         rdFd[0] = -1;
         wrFd[1] = -1;
-        std::vector<std::array<std::int32_t, 2>> fds;
-        fds.push_back(reinterpret_cast<std::array<std::int32_t, 2>&>(rdFd));
-        fds.push_back(reinterpret_cast<std::array<std::int32_t, 2>&>(wrFd));
+        
         //rdFd[1] of child process (writes) ---> to rdFd[0] of parent process (reads)
         //wrFd[0] of child process (reads) ---> to wrFd[1] of parent process (writes)
-        std::string sh("/usr/bin/sh");
-        dup2(rdFd[1], 1);
-        dup2(wrFd[0], 0);
+        
+        dup2(rdFd[1], 1); //This will maps rdFd[1] to stdout and closes stdout fd.
+        dup2(wrFd[0], 0); //This will maps wrFd[0] to stdin and closes stdin fd.
 
-        //char *const args[] = {"/usr/bin/sh",NULL};
-        char *args[] = {"sh", NULL};
-        if(execlp("/usr/bin/sh", "/usr/bin/sh", NULL) < 0) {
+        const char *args[] = {"/usr/bin/sh", NULL};
+        if(execlp(args[0], args[0], NULL) < 0) {
             std::cout << "spawning of/usr/bin/sh processis failed" << std::endl;
             exit(0);
         }
-
-        #if 0
-        while(true) {
-            char data[1024];
-            memset(data, 0, 1024);
-            std::int32_t len = read(wrFd[0], data, 1024);
-            std::cout << "Received " << data << std::endl;
-        }
-        #endif
-        std::cout << "Parent Process Exit" << std::endl;
-
     } else if(!pid) {
 
         //Child Process
@@ -73,10 +59,6 @@ int main(std::int32_t argc, char *argv[]) {
         wrFd[0] = -1;
         //rdFd[1] of child process (writes) ---> to rdFd[0] of parent process (reads)
         //wrFd[0] of child process (reads) ---> to wrFd[1] of parent process (writes)
-
-        std::vector<std::array<std::int32_t, 2>> fds;
-        fds.push_back(reinterpret_cast<std::array<std::int32_t, 2>&>(rdFd));
-        fds.push_back(reinterpret_cast<std::array<std::int32_t, 2>&>(wrFd));
 
         auto receptionFn = [](auto channel) {
             std::array<char, 1024> arr;
@@ -127,9 +109,9 @@ int main(std::int32_t argc, char *argv[]) {
             std::string cmd;
             std::getline(std::cin, cmd);
             std::stringstream ss;
-            //ss << "echo " << cmd.data();;
+
             ss << cmd.data() << "\n";
-            std::int32_t len = write(wrFd[1], reinterpret_cast<const char *>(ss.str().c_str()), /*std::cin.gcount()*/ss.str().length());
+            std::int32_t len = write(wrFd[1], reinterpret_cast<const char *>(ss.str().c_str()), ss.str().length());
             if(len <= 0) {
                 std::cout << "Failed to send Command to executable " << std::endl;
                 exit(0);
@@ -138,7 +120,6 @@ int main(std::int32_t argc, char *argv[]) {
                 receptionFn(rdFd[0]);
             }
         }
-        //reception.join();
 
     } else {
         //error 
