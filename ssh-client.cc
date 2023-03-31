@@ -93,14 +93,13 @@ int main(std::int32_t argc, char *argv[]) {
             if(response.size()) {
                 for(auto const &elm: response) {
                     std::string data(reinterpret_cast<const char *>(elm.data()), elm.size());
-                    std::cout << "The Command output is ====>>>>> " << data.c_str() <<std::endl;
+                    std::cout << "The Command output is ====>>>>> "<< std::endl << data.c_str() <<std::endl;
                 }
             } else {
                 //std::cout << "read is failed " << std::endl;
             }
         };
-        //std::thread reception(entryFn, rdFd[0]);
-
+        
         while(true) {
             std::cout <<std::endl;
             std::cout << "Enter Command now " << std::endl;
@@ -110,13 +109,18 @@ int main(std::int32_t argc, char *argv[]) {
             std::getline(std::cin, cmd);
             std::stringstream ss;
 
-            ss << cmd.data() << "\n";
+            ss << cmd.data();
+            if(ss.str().empty()) {
+                continue;
+            }
+
+            ss << "\n";
             std::int32_t len = write(wrFd[1], reinterpret_cast<const char *>(ss.str().c_str()), ss.str().length());
             if(len <= 0) {
                 std::cout << "Failed to send Command to executable " << std::endl;
                 exit(0);
             } else {
-                std::cout << "Command sent to Executable successfully command: " << ss.str().c_str() << " length: " << ss.str().length() << std::endl;
+                std::cout << "Command sent to Executable successfully command: "<< std::endl << ss.str().c_str() << " length: " << ss.str().length() << std::endl;
                 receptionFn(rdFd[0]);
             }
         }
