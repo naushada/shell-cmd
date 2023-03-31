@@ -13,7 +13,7 @@ link_directories(/usr/local/ACE_TAO-7.0.0/lib)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++2a -g -Wall -Wextra")
 
 #However, the file(GLOB...) allows for wildcard additions:
-file(GLOB SOURCES "src/*.cc")
+file(GLOB SOURCES "*.cc")
 
 add_executable(shellsvc ${SOURCES})
 target_link_libraries(shellsvc pthread)

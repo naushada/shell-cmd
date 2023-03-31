@@ -12,51 +12,80 @@
 #include <sstream>
 #include <thread>
 
+#include "shell.hpp"
+
 int main(std::int32_t argc, char *argv[]) {
 
     int rdFd[2];
     int wrFd[2];
-    std::vector<std::array<std::int32_t, 2>> fds;
+    //std::vector<std::array<std::int32_t, 2>> fds;
+    
 
-    int ret = pipe(rdFd);
+    int ret = pipe(/*shell.fds().at(assakeena::FDs::READ).data()*/rdFd);
     if(ret < 0) {
-        std::cout<< "pipe for rdFd Failed " << std::endl;
+        std::cout<< "pipe for assakeena::FDs::READ Failed " << std::endl;
         return(ret);
     }
-
-    ret = pipe(wrFd);
+    
+    ret = pipe(/*shell.fds().at(assakeena::FDs::WRITE).data()*/wrFd);
     if(ret < 0) {
-        std::cout<< "pipe for rdFd Failed " << std::endl;
+        std::cout<< "pipe for assakeena::FDs::WRITE Failed " << std::endl;
         return(ret);
     }
 
     auto pid = fork();
     if(pid > 0) {
-
         //Parent Process
-        close(rdFd[0]);
-        close(wrFd[1]);
-        rdFd[0] = -1;
-        wrFd[1] = -1;
+        assakeena::Shell shell;
+        std::array<std::int32_t, 2> fdRead{rdFd[0], rdFd[1]};
+        std::array<std::int32_t, 2> fdWrite{wrFd[0], wrFd[1]};
+        //fd.at(assakeena::FDs::READ) = rdFd[0];
+        //fd.at(assakeena::FDs::READ) = rdFd[1];
+        shell.fds(fdRead);
+        shell.fds(fdWrite);
+
+        //close(rdFd[0]);
+        close(shell.fds(assakeena::FDs::READ, assakeena::FDs::READ));
+        //close(wrFd[1]);
+        close(shell.fds(assakeena::FDs::WRITE, assakeena::FDs::WRITE));
+        //rdFd[0] = -1;
+        shell.fds(assakeena::FDs::READ, assakeena::FDs::READ, -1);
+        //wrFd[1] = -1;
+        shell.fds(assakeena::FDs::WRITE, assakeena::FDs::WRITE, -1);
         
         //rdFd[1] of child process (writes) ---> to rdFd[0] of parent process (reads)
         //wrFd[0] of child process (reads) ---> to wrFd[1] of parent process (writes)
         
-        dup2(rdFd[1], 1); //This will maps rdFd[1] to stdout and closes stdout fd.
-        dup2(wrFd[0], 0); //This will maps wrFd[0] to stdin and closes stdin fd.
+        //dup2(rdFd[1], 1); //This will maps rdFd[1] to stdout and closes stdout fd.
+        dup2(shell.fds(assakeena::FDs::READ, assakeena::FDs::WRITE), 1);
+        //dup2(wrFd[0], 0); //This will maps wrFd[0] to stdin and closes stdin fd.
+        dup2(shell.fds(assakeena::FDs::WRITE, assakeena::FDs::READ), 0);
 
-        const char *args[] = {"/usr/bin/sh", NULL};
-        if(execlp(args[0], args[0], NULL) < 0) {
+        //const char *args[] = {"/usr/bin/sh", NULL};
+        std::array<std::string, 2> args = {"/usr/bin/sh", NULL};
+        if(execlp(std::get<0>(args).c_str(), std::get<0>(args).c_str(), std::get<1>(args)) < 0) {
             std::cout << "spawning of/usr/bin/sh processis failed" << std::endl;
             exit(0);
         }
     } else if(!pid) {
 
         //Child Process
-        close(rdFd[1]);
-        close(wrFd[0]);
-        rdFd[1] = -1;
-        wrFd[0] = -1;
+        assakeena::Shell shell;
+        std::array<std::int32_t, 2> fdRead{rdFd[0], rdFd[1]};
+        std::array<std::int32_t, 2> fdWrite{wrFd[0], wrFd[1]};
+        //fd.at(assakeena::FDs::READ) = rdFd[0];
+        //fd.at(assakeena::FDs::READ) = rdFd[1];
+        shell.fds(fdRead);
+        shell.fds(fdWrite);
+        
+        //close(rdFd[1]);
+        close(shell.fds(assakeena::FDs::READ, assakeena::FDs::WRITE));
+        //close(wrFd[0]);
+        close(shell.fds(assakeena::FDs::WRITE, assakeena::FDs::READ));
+        //rdFd[1] = -1;
+        shell.fds(assakeena::FDs::READ, assakeena::FDs::WRITE, -1);
+        //wrFd[0] = -1;
+        shell.fds(assakeena::FDs::WRITE, assakeena::FDs::READ, -1);
         //rdFd[1] of child process (writes) ---> to rdFd[0] of parent process (reads)
         //wrFd[0] of child process (reads) ---> to wrFd[1] of parent process (writes)
 
@@ -115,13 +144,13 @@ int main(std::int32_t argc, char *argv[]) {
             }
 
             ss << "\n";
-            std::int32_t len = write(wrFd[1], reinterpret_cast<const char *>(ss.str().c_str()), ss.str().length());
+            std::int32_t len = write(/*wrFd[1]*/shell.fds(assakeena::FDs::WRITE, assakeena::FDs::WRITE), reinterpret_cast<const char *>(ss.str().c_str()), ss.str().length());
             if(len <= 0) {
                 std::cout << "Failed to send Command to executable " << std::endl;
                 exit(0);
             } else {
                 std::cout << "Command sent to Executable successfully command: "<< std::endl << ss.str().c_str() << " length: " << ss.str().length() << std::endl;
-                receptionFn(rdFd[0]);
+                receptionFn(shell.fds(assakeena::FDs::READ, assakeena::FDs::READ));
             }
         }
 

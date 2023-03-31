@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16.3)
 project(offtarget)
 find_package(GTest REQUIRED)
 
-include_directories(../inc)
+include_directories(..)
 include_directories(test)
 include_directories(/usr/local/ACE_TAO-7.0.0/include)
 
