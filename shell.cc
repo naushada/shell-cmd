@@ -1,5 +1,5 @@
-#ifndef __SSH_CLIENT_CC__
-#define __SSH_CLIENT_CC__
+#ifndef __SHELL_CC__
+#define __SHELL_CC__
 
 
 #include <unistd.h>
@@ -142,4 +142,4 @@ int main(std::int32_t argc, char *argv[]) {
 
 
 
-#endif
+#endif /* __SHELL_CC__*/
