@@ -18,7 +18,7 @@ int main(std::int32_t argc, char *argv[]) {
 
     assakeena::Shell shell;
     int ret = pipe(shell.fds().at(assakeena::FDs::READ).data());
-    
+
     if(ret < 0) {
         std::cout<< "pipe for assakeena::FDs::READ Failed " << std::endl;
         return(ret);
@@ -56,13 +56,14 @@ int main(std::int32_t argc, char *argv[]) {
         //Child Process
         close(shell.fds(assakeena::FDs::READ, assakeena::FDs::WRITE));
         close(shell.fds(assakeena::FDs::WRITE, assakeena::FDs::READ));
+
         shell.fds(assakeena::FDs::READ, assakeena::FDs::WRITE, -1);
         shell.fds(assakeena::FDs::WRITE, assakeena::FDs::READ, -1);
 
         //rdFd[1] of child process (writes) ---> to rdFd[0] of parent process (reads)
         //wrFd[0] of child process (reads) ---> to wrFd[1] of parent process (writes)
 
-        auto receptionFn = [](auto channel) {
+        auto receptionFn = [](auto channel) -> auto {
             std::array<char, 1024> arr;
             std::vector<std::array<char, 1024>> response;
             ssize_t len = -1;
@@ -100,6 +101,7 @@ int main(std::int32_t argc, char *argv[]) {
             } else {
                 //std::cout << "read is failed " << std::endl;
             }
+            return(response);
         };
         
         while(true) {
@@ -117,19 +119,20 @@ int main(std::int32_t argc, char *argv[]) {
             }
 
             ss << "\n";
-            std::int32_t len = write(/*wrFd[1]*/shell.fds(assakeena::FDs::WRITE, assakeena::FDs::WRITE), reinterpret_cast<const char *>(ss.str().c_str()), ss.str().length());
+            std::int32_t len = write(shell.fds(assakeena::FDs::WRITE, assakeena::FDs::WRITE), reinterpret_cast<const char *>(ss.str().c_str()), ss.str().length());
             if(len <= 0) {
                 std::cout << "Failed to send Command to executable " << std::endl;
                 exit(0);
             } else {
                 std::cout << "command: " << std::endl << ss.str().c_str() << "sent to Executable length: " << ss.str().length() << std::endl;
-                receptionFn(shell.fds(assakeena::FDs::READ, assakeena::FDs::READ));
+                auto result = receptionFn(shell.fds(assakeena::FDs::READ, assakeena::FDs::READ));
             }
         }
 
     } else {
         //error 
         std::cout << " fork failed " << std::endl;
+        exit(0);
     }
 }
 
