@@ -73,7 +73,7 @@ int main(std::int32_t argc, char *argv[]) {
             do {
                 arr.fill(0);
                 FD_SET(channel, &fdset);
-                struct timeval to = {0,0};
+                struct timeval to = {0,10};
                 auto ret = select((channel + 1), &fdset, NULL, NULL, &to);
 
                 if(ret <= 0) {
