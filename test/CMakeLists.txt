@@ -19,11 +19,10 @@ enable_testing()
 add_executable(offtarget ${SOURCES})
 target_link_libraries(offtarget gtest_main)
 
-target_link_libraries(offtarget pthread)
+target_link_libraries(offtarget gtest pthread)
 target_link_libraries(offtarget ACE)
 target_link_libraries(offtarget ACE_SSL)
 target_link_libraries(offtarget ssl crypto)
-target_link_libraries(offtarget gtest)
 
 add_test(offtarget_gtests offtarget)
 gtest_discover_tests(offtarget)

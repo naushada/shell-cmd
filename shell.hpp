@@ -16,7 +16,7 @@ namespace assakeena {
     class Shell {
         public:
             Shell() {
-
+                m_fds = {{0, 0}, {0, 0}};
             }
 
             ~Shell() {
