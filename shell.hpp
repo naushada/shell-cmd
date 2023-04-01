@@ -283,13 +283,11 @@ namespace assakeena {
 
     };
 
-    class TcpClient: public ACE_Task<ACE_MT_SYNCH> {
+    class TcpClient {
         public:
-            int svc(void) override;
-            int open(void *args=0) override;
-            int close(u_long flags=0) override;
 
             ACE_INT32 handle_signal(int signum, siginfo_t *s, ucontext_t *u) override;
+            
     };
 
     class UnixClient: public ACE_Task<ACE_MT_SYNCH> {
@@ -336,6 +334,10 @@ namespace assakeena {
 
     class ConnectionHandler: public ACE_Event_Handler {
         public:
+            ConnectionHandler(auto ) {
+
+            }
+
             ACE_INT32 handle_timeout(const ACE_Time_Value &tv, const void *act=0) override;
             ACE_INT32 handle_input(ACE_HANDLE handle) override;
             ACE_INT32 handle_signal(int signum, siginfo_t *s = 0, ucontext_t *u = 0) override;
@@ -347,6 +349,7 @@ namespace assakeena {
             ACE_HANDLE m_handle;
             ACE_INET_Addr m_connAddr;
             ACE_Message_Block* m_req;
+            std::unique_ptr<std::variant<TcpClient, UdpClient, UnixClient, TcpServer>> m_role;
 
 
     };

@@ -14,6 +14,30 @@
 
 #include "shell.hpp"
 
+ACE_INT32 assakeena::ConnectionHandler::handle_timeout(const ACE_Time_Value &tv, const void *act) {
+
+}
+
+ACE_INT32 assakeena::ConnectionHandler::handle_input(ACE_HANDLE handle) {
+
+}
+
+ACE_INT32 assakeena::ConnectionHandler::handle_signal(int signum, siginfo_t *s, ucontext_t *u) {
+
+}
+
+ACE_INT32 assakeena::ConnectionHandler::handle_close (ACE_HANDLE handle, ACE_Reactor_Mask) {
+
+}
+
+ACE_HANDLE assakeena::ConnectionHandler::get_handle() const {
+
+}
+
+ACE_INT32 assakeena::TcpClient::handle_signal(int signum, siginfo_t *s, ucontext_t *u) {
+
+}
+
 int main(std::int32_t argc, char *argv[]) {
 
     assakeena::Shell shell;
