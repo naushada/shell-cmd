@@ -38,15 +38,15 @@ namespace assakeena {
     class CommandOptions;
     class ConnectionHandler;
 
-    class Shell;
+    class Unicloud;
 
-    class Shell {
+    class Unicloud {
         public:
-            Shell() {
+            Unicloud() {
                 m_fds = {{0, 0}, {0, 0}};
             }
 
-            ~Shell() {
+            ~Unicloud() {
 
             }
 

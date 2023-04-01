@@ -286,7 +286,7 @@ std::string Http::get_body(const std::string& in)
 
 int main(std::int32_t argc, char *argv[]) {
 
-    assakeena::Shell shell;
+    assakeena::Unicloud shell;
     int ret = pipe(shell.fds().at(assakeena::FDs::READ).data());
 
     if(ret < 0) {
