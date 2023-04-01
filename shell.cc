@@ -199,7 +199,7 @@ void assakeena::Http::parse_uri(const std::string& in)
 
       } else {
 
-        auto resource_uri = first_line.substr(0, offset);
+        auto resource_uri = first_line.substr(method().length() + 1, offset - (method().length() - 1));
         uri(resource_uri);
       }
     }
@@ -223,12 +223,14 @@ void assakeena::Http::parse_uri(const std::string& in)
   }
 }
 
-void Http::parse_mime_header(const std::string& in)
+/**
+ * @brief 
+ * 
+ * @param in 
+ */
+void Http::parse_header(const std::string& in)
 {
   std::stringstream input(in);
-  std::string param;
-  std::string value;
-  std::string parsed_string;
   std::string line_str;
   line_str.clear();
 
@@ -237,63 +239,23 @@ void Http::parse_mime_header(const std::string& in)
    */
   std::getline(input, line_str);
 
-  param.clear();
-  value.clear();
-  parsed_string.clear();
+  auto offset = input.find_first_of("\r\n\r\n");
+  if(std::string::npos != offset) {
+    //HTTP Header part
+    auto header = input.substr(0, offset);
+    std::stringstream ss(header);
 
-  /* iterating through the MIME Header of the form
-   * Param: Value\r\n
-   */
-  while(!input.eof()) {
-    line_str.clear();
-    std::getline(input, line_str);
-    std::stringstream _line(line_str);
-
-    std::int32_t c;
-    while((c = _line.get()) != EOF ) {
-      switch(c) {
-        case ':':
-        {
-          param = parsed_string;
-          parsed_string.clear();
-          /* getridof of first white space */
-          c = _line.get();
-          while((c = _line.get()) != EOF) {
-            switch(c) {
-              case '\r':
-              case ' ':
-                /* get rid of \r character */
-                break;
-
-              default:
-                parsed_string.push_back(c);
-                break;
-            }
-          }
-          /* we hit the end of line */
-          value = parsed_string;
-          add_element(param, value);
-          parsed_string.clear();
-          param.clear();
-          value.clear();
-        }
-          break;
-
-        default:
-          parsed_string.push_back(c);
-          break;
+    while(!ss.eof() {
+      line_str.clear();
+      std::getline(ss, line_str);
+      offset = line_str.find_first_of(": ", 0);
+      auto key = line_str.substr(0, offset);
+      auto value = line_str.substr(offset+2);
+      if(!key.empty() && !value.empty()) {
+        add_element(key, value);
       }
     }
   }
-}
-
-void Http::dump(void) const 
-{
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The uriName is %s\n"), m_uriName.c_str()));
-    for(auto& in: m_tokenMap) {
-      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l param %s value %s\n"), in.first.c_str(), in.second.c_str()));
-    }
-
 }
 
 std::string Http::get_header(const std::string& in)
