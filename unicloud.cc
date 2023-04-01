@@ -1,5 +1,5 @@
-#ifndef __SHELL_CC__
-#define __SHELL_CC__
+#ifndef __unicloud_cc__
+#define __unicloud_cc__
 
 
 #include <unistd.h>
@@ -351,4 +351,4 @@ int main(std::int32_t argc, char *argv[]) {
 
 
 
-#endif /* __SHELL_CC__*/
+#endif /* __unicloud_cc__*/

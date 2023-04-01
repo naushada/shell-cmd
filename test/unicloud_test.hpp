@@ -1,5 +1,5 @@
-#ifndef __shellsvc_test_hpp__
-#define __shellsvc_test_hpp__
+#ifndef __unicloud_test_hpp__
+#define __unicloud_test_hpp__
 
 #include <gtest/gtest.h>
 #include <vector>
@@ -9,7 +9,7 @@
 #include <iostream>
 #include <fstream>
 
-#include "shell.hpp"
+#include "unicloud.hpp"
 
 class ShellSvcTest : public ::testing::Test
 {
@@ -22,4 +22,4 @@ class ShellSvcTest : public ::testing::Test
         virtual void TestBody() override;
 };
 
-#endif /*__shellsvc_test_hpp__*/
+#endif /*__unicloud_test_hpp__*/

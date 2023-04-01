@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16.3)
-project(shell-service)
+project(unicloud)
 
 add_subdirectory(test)
 
@@ -15,9 +15,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++2a -g -Wall -Wextra")
 #However, the file(GLOB...) allows for wildcard additions:
 file(GLOB SOURCES "*.cc")
 
-add_executable(shellsvc ${SOURCES})
-target_link_libraries(shellsvc pthread)
-target_link_libraries(shellsvc ACE)
-target_link_libraries(shellsvc ACE_SSL)
-target_link_libraries(shellsvc ssl crypto)
+add_executable(unicloud ${SOURCES})
+target_link_libraries(unicloud pthread)
+target_link_libraries(unicloud ACE)
+target_link_libraries(unicloud ACE_SSL)
+target_link_libraries(unicloud ssl crypto)
 

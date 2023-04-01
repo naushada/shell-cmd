@@ -1,5 +1,5 @@
-#ifndef __shell_hpp__
-#define __shell_hpp__
+#ifndef __unicloud_hpp__
+#define __unicloud_hpp__
 
 /**
  * @brief assakeena - the Spirit of Tranquility, or Peace of Reassurance
@@ -467,4 +467,4 @@ namespace assakeena {
 
 
 
-#endif /* __shell_hpp__*/
+#endif /* __unicloud_hpp__*/
