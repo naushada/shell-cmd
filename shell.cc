@@ -134,22 +134,26 @@ void assakeena::Http::format_value(const std::string& param) {
   value.clear();
 
   while((c = input.get()) != EOF) {
-    case '+':
-      value.push_back(' ');
-    break;
+    switch(c) {
+      case '+':
+        value.push_back(' ');
+      break;
 
-    case '%':
-      std::int8_t octalCode[3];
-      octalCode[0] = (std::int8_t)input.get();
-      octalCode[1] = (std::int8_t)input.get();
-      octalCode[2] = 0;
-      std::string octStr((const char *)octalCode, 3);
-      std::int32_t ch = std::stoi(octStr, nullptr, 16);
-      value.push_back(ch);
-    break;
+      case '%':
+      {
+        std::int8_t octalCode[3];
+        octalCode[0] = (std::int8_t)input.get();
+        octalCode[1] = (std::int8_t)input.get();
+        octalCode[2] = 0;
+        std::string octStr((const char *)octalCode, 3);
+        std::int32_t ch = std::stoi(octStr, nullptr, 16);
+        value.push_back(ch);
+      }
+      break;
 
-    default:
-      value.push_back(c);
+      default:
+        value.push_back(c);
+    }
   }
 
   if(!value.empty() && !name.empty()) {
@@ -179,39 +183,42 @@ void assakeena::Http::parse_uri(const std::string& in)
       //e.g. The request string is GET /webui/main.04e34705edfe295e.js HTTP/1.1
       auto req_method = first_line.substr(0, offset);
       method(req_method); //GET/POST/PUT/DELETE/OPTIONS
-      offset = first_line.find_first_of("?", offset);
+      offset = first_line.find_first_of("?");
 
       if(std::string::npos == offset) {
 
         //'?' is not present in the first_line, which means QS - Query String is not present
         //e.g. The request string is GET /webui/main.04e34705edfe295e.js HTTP/1.1
-        offset = first_line.find_first_of(" ", method().length());
+        offset = first_line.find_first_of(" ", method().length() + 1);
 
         if(std::string::npos != offset) {
-          auto resource_uri = first_line.substr((method.length() + 1), offset);
+          auto resource_uri = first_line.substr(0, offset);
           uri(resource_uri);
           return;
         }
 
       } else {
 
-        auto resource_uri = first_line.substr((method().length() + 1), offset);
+        auto resource_uri = first_line.substr(0, offset);
         uri(resource_uri);
       }
     }
 
-    std::stringstream QS(first_line.substr((offset + 1));
+    std::string QS(first_line.substr(offset + 1);
+    offset = QS.find_last_of(" ");
+    QS = QS.substr(0, offset);
 
     while(true) {
 
       offset = QS.find_first_of("&");
       if(std::string::npos == offset) {
+        format_value(QS);
         break;
       }
       auto key_value = QS.substr(0, offset);
       format_value(key_value);
       QS = QS.substr(offset+1);
-      
+
     }
   }
 }
