@@ -334,8 +334,21 @@ namespace assakeena {
 
     class ConnectionHandler: public ACE_Event_Handler {
         public:
-            ConnectionHandler(auto ) {
-
+            ConnectionHandler(auto role) {
+                switch(role) {
+                    case Role::UdpClient:
+                        m_role = std::make_unique<UdpClient>();
+                    break;
+                    case Role::TcpClient:
+                        m_role = std::make_unique<TcpClient>();
+                    break;
+                    case Role::UnixClient:
+                        m_role = std::make_unique<UnixClient>();
+                    break;
+                    case Role::TcpServer:
+                        m_role = std::make_unique<TcpServer>();
+                    break;
+                }
             }
 
             ACE_INT32 handle_timeout(const ACE_Time_Value &tv, const void *act=0) override;
@@ -349,7 +362,7 @@ namespace assakeena {
             ACE_HANDLE m_handle;
             ACE_INET_Addr m_connAddr;
             ACE_Message_Block* m_req;
-            std::unique_ptr<std::variant<TcpClient, UdpClient, UnixClient, TcpServer>> m_role;
+            std::variant<std::unique_ptr<TcpClient>, std::unique_ptr<UdpClient>, std::unique_ptr<UnixClient>, std::unique_ptr<TcpServer>> m_role;
 
 
     };
