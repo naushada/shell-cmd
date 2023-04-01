@@ -285,7 +285,8 @@ namespace assakeena {
 
     class TcpClient {
         public:
-
+            auto rx(const std::string& in);
+            auto to(auto in);
             ACE_INT32 handle_signal(int signum, siginfo_t *s, ucontext_t *u) override;
             
     };
@@ -312,12 +313,10 @@ namespace assakeena {
 
     };
 
-    class TcpServer: public ACE_Task<ACE_MT_SYNCH> {
+    class TcpServer {
         public:
-            int svc(void) override;
-            int open(void *args=0) override;
-            int close(u_long flags=0) override;
-
+            auto rx(const std::string& in);
+            auto to(auto in);
             ACE_INT32 handle_signal(int signum, siginfo_t *s, ucontext_t *u) override;
     };
 

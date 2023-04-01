@@ -19,7 +19,11 @@ ACE_INT32 assakeena::ConnectionHandler::handle_timeout(const ACE_Time_Value &tv,
 }
 
 ACE_INT32 assakeena::ConnectionHandler::handle_input(ACE_HANDLE handle) {
-
+    std::int32_t ret = -1;
+    fd_set rd_fd;
+    while(true) {
+        len = recv(handle, scratch_pad.data(), scratch_pad.size(), 0);
+    }
 }
 
 ACE_INT32 assakeena::ConnectionHandler::handle_signal(int signum, siginfo_t *s, ucontext_t *u) {
@@ -34,7 +38,13 @@ ACE_HANDLE assakeena::ConnectionHandler::get_handle() const {
 
 }
 
-ACE_INT32 assakeena::TcpClient::handle_signal(int signum, siginfo_t *s, ucontext_t *u) {
+auto assakeena::TcpClient::rx(const std::string& in) {
+    std::string rsp;
+
+    return(rsp);
+}
+
+auto assakeena::TcpClient::time_out(const auto& in) {
 
 }
 
