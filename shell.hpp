@@ -87,24 +87,25 @@ namespace assakeena {
                 response.clear();
                 FD_ZERO(&fdset);
                 arr.fill(0);
+                
+                while(true) {
+                    FD_SET(channel, &fdset);
+                    struct timeval to = {0,100};
+                    auto ret = select((channel + 1), &fdset, NULL, NULL, &to);
 
-                FD_SET(channel, &fdset);
-                struct timeval to = {0,100};
-                auto ret = select((channel + 1), &fdset, NULL, NULL, &to);
+                    if(ret <= 0) {
+                        break;
+                    }
 
-                if(ret <= 0) {
-                    break;
-                }
+                    if(FD_ISSET(channel, &fdset)) {
+                        len = read(channel, (void *)arr.data(), (size_t)arr.size());
 
-                if(FD_ISSET(channel, &fdset)) {
-                    len = read(channel, (void *)arr.data(), (size_t)arr.size());
-
-                    if(len > 0) {
-                        std::cout << "Pushing into vector " << std::endl;
-                        response.push_back(arr);
+                        if(len > 0) {
+                            std::cout << "Pushing into vector " << std::endl;
+                            response.push_back(arr);
+                        }
                     }
                 }
-
                 if(response.size()) {
                     for(auto const &elm: response) {
                         std::string data(reinterpret_cast<const char *>(elm.data()), elm.size());
@@ -287,7 +288,7 @@ namespace assakeena {
         public:
             auto rx(const std::string& in);
             auto to(auto in);
-            ACE_INT32 handle_signal(int signum, siginfo_t *s, ucontext_t *u) override;
+        private:    
             
     };
 
@@ -355,12 +356,12 @@ namespace assakeena {
             ACE_INT32 handle_signal(int signum, siginfo_t *s = 0, ucontext_t *u = 0) override;
             ACE_INT32 handle_close (ACE_HANDLE = ACE_INVALID_HANDLE, ACE_Reactor_Mask = 0) override;
             ACE_HANDLE get_handle() const override;
+            ACE_INT32 tx(const std::string& rsp, ACE_HANDLE handle);
 
         private:
             long m_timerId;
             ACE_HANDLE m_handle;
             ACE_INET_Addr m_connAddr;
-            ACE_Message_Block* m_req;
             std::variant<std::unique_ptr<TcpClient>, std::unique_ptr<UdpClient>, std::unique_ptr<UnixClient>, std::unique_ptr<TcpServer>> m_role;
 
 
@@ -376,6 +377,71 @@ namespace assakeena {
             std::variant<UdpClient, TcpClient, UnixClient, UdpServer, TcpServer, UnixServer> m_role;
     }
 
+    class Http {
+        public:
+            Http() {
+                m_uri.clear();
+                m_params.clear();
+            }
+
+            Http(const std::string& in) {
+                m_uri.clear();
+                m_params.clear();
+                m_header.clear();
+                m_body.clear();
+
+                m_header = get_header(in);
+
+                if(m_header.length()) {
+                    parse_uri(m_header);
+                    parse_header(m_header);
+                    //dump();
+                }
+
+                m_body = get_body(in);
+            }
+
+            ~Http() {
+                m_tokenMap.clear();
+            }
+
+            std::string uri() const {
+                return(m_uri);
+            }
+
+            void uri(std::string _uri) {
+                m_uri = _uri;
+            }
+
+            void add_element(std::string key, std::string value) {
+                m_params.insert(std::pair(key, value));
+            }
+
+            std::string element(const std::string& key) {
+                auto it = m_params.find(key);
+                if(it != m_params.end()) {
+                    return(it->second);
+                }
+                return std::string();
+            }
+
+            std::string body() {
+                return m_body;
+            }
+
+            std::string header() {
+                return m_header;
+            }
+
+            void parse_uri(const std::string& in);
+            void parse_header(const std::string& in);
+
+        private:
+            std::unordered_map<std::string, std::string> m_params;
+            std::string m_uri;
+            std::string m_header;
+            std::string m_body;
+    };
 }
 
 
