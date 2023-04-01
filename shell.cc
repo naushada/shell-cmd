@@ -237,20 +237,25 @@ void Http::parse_header(const std::string& in)
   /* getridof first request line 
    * GET/POST/PUT/DELETE <uri>?uriName[&param=value]* HTTP/1.1\r\n
    */
-  std::getline(input, line_str);
+  std::getline(input, line_str, "\r\n");
 
-  auto offset = input.find_first_of("\r\n\r\n");
+  auto offset = input.find_last_of("\r\n\r\n");
   if(std::string::npos != offset) {
     //HTTP Header part
     auto header = input.substr(0, offset);
     std::stringstream ss(header);
 
-    while(!ss.eof() {
+    while(!ss.eof()) {
+
       line_str.clear();
-      std::getline(ss, line_str);
+      std::getline(ss, line_str, "\r\n");
       offset = line_str.find_first_of(": ", 0);
       auto key = line_str.substr(0, offset);
       auto value = line_str.substr(offset+2);
+      //getting rid oftrailing \r\n
+      offset = value.find_first_of("\r\n");
+      value = value.substr(0, offset);
+
       if(!key.empty() && !value.empty()) {
         add_element(key, value);
       }
@@ -260,59 +265,21 @@ void Http::parse_header(const std::string& in)
 
 std::string Http::get_header(const std::string& in)
 {
-
-  if(std::string::npos != in.find("Content-Type: application/json")) {
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json\n")));
-    std::string body_delimeter("\r\n\r\n");
-    size_t body_offset = in.find(body_delimeter.c_str(), 0, body_delimeter.length());
-    if(std::string::npos != body_offset) {
-      body_offset += body_delimeter.length();
-      std::string document = in.substr(0, body_offset);
-
-      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The header is %s\n"), document.c_str()));
-      return(document);
-    }
+  std::string header("");
+  auto offset = in.find_last_of("\r\n\r\n");
+  if(std::string::npos != offset) {
+    header = in.substr(0, offset);
   }
-  return(std::string(in));
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [http:%t] %M %N:%l HTTP Header: %s\n", header.c_str())));
+  return(header);
+
 }
 
 std::string Http::get_body(const std::string& in)
 {
-  std::string ct = get_element("Content-Type");
-  std::string contentLen = get_element("Content-Length");
-  std::string body_delimeter("\r\n\r\n");
-  std::string ty("application/json");
-
-  if(ct.length() && !ct.compare("application/json") && contentLen.length()) {
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json CL %d hdrlen %d\n"), std::stoi(contentLen), header().length()));
-
-    size_t body_offset = in.find(body_delimeter.c_str(), 0, body_delimeter.length());
-
-    if(std::string::npos != body_offset) {
-      std::string bdy(in.substr((body_delimeter.length() + body_offset), std::stoi(contentLen)));
-      //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Bodylen is %d The BODY is \n%s\n"), bdy.length(), bdy.c_str()));
-
-      if(contentLen.length() && (in.length() == header().length() + std::stoi(contentLen))) {
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Bodylen is %d The BODY is \n%s\n"), bdy.length(), bdy.c_str()));
-        return(bdy);
-      }
-    }
-
-    return(std::string());
-
-    #if 0
-    std::string body_delimeter("\r\n\r\n");
-    size_t body_offset = in.find(body_delimeter, 0);
-    if(std::string::npos != body_offset) {
-      body_offset += body_delimeter.length();
-      std::string document = in.substr(body_offset);
-
-      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The body is %s\n"), document.c_str()));
-      return(document);
-    }
-    #endif
-  }
-  return(std::string());
+  auto header = get_header(in);
+  auto bdy = in.substr(header.length(), in.length() - header.length());
+  return(bdy);
 }
 
 // MAIN =============
