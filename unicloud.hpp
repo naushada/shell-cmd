@@ -288,6 +288,8 @@ namespace assakeena {
         public:
             auto rx(const std::string& in);
             auto to(auto in);
+            auto start(const std::string& IP, const std::uint32_t &port);
+            auto stop();
         private:    
             
     };
@@ -395,7 +397,6 @@ namespace assakeena {
                 if(m_header.length()) {
                     parse_uri(m_header);
                     parse_header(m_header);
-                    //dump();
                 }
 
                 m_body = get_body(in);
