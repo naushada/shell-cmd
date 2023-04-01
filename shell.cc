@@ -120,114 +120,98 @@ auto assakeena::TcpClient::time_out(const auto& in) {
 
 // HTTP =====================
 
+/**
+ * @brief 
+ * 
+ * @param param 
+ */
+void assakeena::Http::format_value(const std::string& param) {
+  auto offset = param.find_first_of("=", 0);
+  auto name = param.substr(0, offset);
+  auto value = param.substr((offset + 1));
+  std::stringstream ss(value);
+  std::int32_t c;
+  value.clear();
 
-void Http::parse_uri(const std::string& in)
+  while((c = input.get()) != EOF) {
+    case '+':
+      value.push_back(' ');
+    break;
+
+    case '%':
+      std::int8_t octalCode[3];
+      octalCode[0] = (std::int8_t)input.get();
+      octalCode[1] = (std::int8_t)input.get();
+      octalCode[2] = 0;
+      std::string octStr((const char *)octalCode, 3);
+      std::int32_t ch = std::stoi(octStr, nullptr, 16);
+      value.push_back(ch);
+    break;
+
+    default:
+      value.push_back(c);
+  }
+
+  if(!value.empty() && !name.empty()) {
+    add_element(name, value);
+  }
+}
+
+/**
+ * @brief 
+ * 
+ * @param in 
+ */
+void assakeena::Http::parse_uri(const std::string& in)
 {
   std::string delim("\r\n");
-  size_t offset = in.find(delim, 0);
+  size_t offset = in.find_first_of(delim, 0);
 
   if(std::string::npos != offset) {
     /* Qstring */
-    std::string req = in.substr(0, offset);
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The request string is %s\n"), req.c_str()));
-    std::stringstream input(req);
-    std::string parsed_string;
-    std::string param;
-    std::string value;
-    bool isQsPresent = false;
+    std::string first_line = in.substr(0, offset);
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The request string is: %s\n"), first_line.c_str()));
 
-    parsed_string.clear();
-    param.clear();
-    value.clear();
+    offset = first_line.find_first_of(" ", 0);
+    // HTTP Request line must start with method - GET/POST/PUT/DELETE/OPTIONS
+    if(std::string::npos != offset) {
 
-    std::int32_t c;
-    while((c = input.get()) != EOF) {
-      switch(c) {
-        case ' ':
-        {
-          std::int8_t endCode[4];
-          endCode[0] = (std::int8_t)input.get();
-          endCode[1] = (std::int8_t)input.get();
-          endCode[2] = (std::int8_t)input.get();
-          endCode[3] = (std::int8_t)input.get();
+      //e.g. The request string is GET /webui/main.04e34705edfe295e.js HTTP/1.1
+      auto req_method = first_line.substr(0, offset);
+      method(req_method); //GET/POST/PUT/DELETE/OPTIONS
+      offset = first_line.find_first_of("?", offset);
 
-          std::string p((const char *)endCode, 4);
+      if(std::string::npos == offset) {
 
-          if(!p.compare("HTTP")) {
+        //'?' is not present in the first_line, which means QS - Query String is not present
+        //e.g. The request string is GET /webui/main.04e34705edfe295e.js HTTP/1.1
+        offset = first_line.find_first_of(" ", method().length());
 
-            if(!isQsPresent) {
-
-              m_uriName = parsed_string;
-              parsed_string.clear();
-
-            } else {
-
-              value = parsed_string;
-              add_element(param, value);
-            }
-          } else {
-            /* make available to stream to be get again*/
-            input.unget();
-            input.unget();
-            input.unget();
-            input.unget();
-          }
-
-          parsed_string.clear();
-          param.clear();
-          value.clear();
+        if(std::string::npos != offset) {
+          auto resource_uri = first_line.substr((method.length() + 1), offset);
+          uri(resource_uri);
+          return;
         }
-          break;
 
-        case '+':
-        {
-          parsed_string.push_back(' ');
-        }
-          break;
+      } else {
 
-        case '?':
-        {
-          isQsPresent = true;
-          m_uriName = parsed_string;
-          parsed_string.clear();
-        }
-          break;
-
-        case '&':
-        {
-          value = parsed_string;
-          add_element(param, value);
-          parsed_string.clear();
-          param.clear();
-          value.clear();
-        }
-          break;
-
-        case '=':
-        {
-          param = parsed_string;
-          parsed_string.clear();
-        }
-          break;
-
-        case '%':
-        {
-          std::int8_t octalCode[3];
-          octalCode[0] = (std::int8_t)input.get();
-          octalCode[1] = (std::int8_t)input.get();
-          octalCode[2] = 0;
-          std::string octStr((const char *)octalCode, 3);
-          std::int32_t ch = std::stoi(octStr, nullptr, 16);
-          parsed_string.push_back(ch);
-        }
-          break;
-
-        default:
-        {
-          parsed_string.push_back(c);
-        }
-          break;  
+        auto resource_uri = first_line.substr((method().length() + 1), offset);
+        uri(resource_uri);
       }
+    }
+
+    std::stringstream QS(first_line.substr((offset + 1));
+
+    while(true) {
+
+      offset = QS.find_first_of("&");
+      if(std::string::npos == offset) {
+        break;
+      }
+      auto key_value = QS.substr(0, offset);
+      format_value(key_value);
+      QS = QS.substr(offset+1);
+      
     }
   }
 }

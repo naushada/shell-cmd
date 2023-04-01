@@ -405,6 +405,14 @@ namespace assakeena {
                 m_tokenMap.clear();
             }
 
+            std::string method() {
+                return(m_method);
+            }
+
+            void method(std::string _method) {
+                m_method = _method;
+            }
+
             std::string uri() const {
                 return(m_uri);
             }
@@ -417,7 +425,7 @@ namespace assakeena {
                 m_params.insert(std::pair(key, value));
             }
 
-            std::string element(const std::string& key) {
+            std::string value(const std::string& key) {
                 auto it = m_params.find(key);
                 if(it != m_params.end()) {
                     return(it->second);
@@ -432,7 +440,7 @@ namespace assakeena {
             std::string header() {
                 return m_header;
             }
-
+            void format_value(const std::string& param);
             void parse_uri(const std::string& in);
             void parse_header(const std::string& in);
 
@@ -441,6 +449,7 @@ namespace assakeena {
             std::string m_uri;
             std::string m_header;
             std::string m_body;
+            std::string m_method;
     };
 }
 
