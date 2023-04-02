@@ -323,12 +323,15 @@ namespace assakeena {
 
     };
 
-    class TcpServer {
+    class TcpServer : public ACE_Task<ACE_MT_SYNCH> {
         public:
             ~TcpServer() {}
             
             ACE_INT32 handle_signal(int signum, siginfo_t *s, ucontext_t *u) override;
-
+            int svc(void) override;
+            int open(void *args=0) override;
+            int close(u_long flags=0) override;
+            
             TcpServer(auto config) {
                 std::string addr("");
 
@@ -397,14 +400,17 @@ namespace assakeena {
 
                     case Role::UdpClient:
                         m_service = std::make_unique<UdpClient>(config);
+                        m_handle = m_server->handle();
                     break;
 
                     case Role::TcpClient:
                         m_service = std::make_unique<TcpClient>(config);
+                        m_handle = m_server->handle();
                     break;
 
                     case Role::UnixClient:
                         m_service = std::make_unique<UnixClient>(config);
+                        m_handle = m_server->handle();
                     break;
 
                     case Role::TcpServer:
@@ -414,10 +420,12 @@ namespace assakeena {
 
                     case Role::UdpServer:
                         m_service = std::make_unique<UdpServer>(config);
+                        m_handle = m_server->handle();
                     break;
 
                     case Role::UnixServer:
                         m_service = std::make_unique<UnixServer>(config);
+                        m_handle = m_server->handle();
                     break;
                 }
             }

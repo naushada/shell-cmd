@@ -88,6 +88,7 @@ ACE_INT32 assakeena::ServiceHandler::tx(const std::string &rsp, ACE_HANDLE handl
 }
 
 ACE_INT32 assakeena::ServiceHandler::rx(ACE_HANDLE handle) {
+
     std::int32_t ret = -1;
     fd_set rd_fd;
     FD_ZERO(&rd_fd);
@@ -136,18 +137,15 @@ ACE_INT32 assakeena::ServiceHandler::rx(ACE_HANDLE handle) {
     }
 }
 
-ACE_INT32 assakeena::ConnectionHandler::handle_signal(int signum, siginfo_t *s, ucontext_t *u) {
+ACE_INT32 assakeena::ServiceHandler::stop() {
 
 }
 
-ACE_INT32 assakeena::ConnectionHandler::handle_close (ACE_HANDLE handle, ACE_Reactor_Mask) {
+ACE_HANDLE assakeena::ServiceHandler::start() {
 
 }
 
-ACE_HANDLE assakeena::ConnectionHandler::get_handle() const {
-
-}
-
+// TCP Client ==========================>>>>>
 /**
  * @brief 
  * 
@@ -168,6 +166,36 @@ auto assakeena::TcpClient::rx(const std::vector<std::string>& in) {
 
 auto assakeena::TcpClient::time_out(const auto& in) {
 
+}
+
+
+//TCP Server ==================>>>>>
+int assakeena::TcpServer::svc(void) {
+
+}
+
+int assakeena::TcpServer::open(void *args) {
+
+}
+
+int assakeena::TcpServer::close(u_long flags) {
+
+}
+
+ACE_INT32 assakeena::TcpServer::handle_signal(int signum, siginfo_t *s, ucontext_t *u) {
+
+}
+
+auto assakeena::TcpServer::rx(const std::string& in) {
+
+}
+
+auto assakeena::TcpServer::to(auto in) {
+
+}
+
+auto assakeena::TcpServer::tx(std::string out) {
+  
 }
 
 // HTTP =====================
