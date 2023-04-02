@@ -176,11 +176,12 @@ namespace assakeena {
                 opts.long_option(ACE_TEXT("help"),                      'h', ACE_Get_Opt::ARG_REQUIRED);
 
                 m_opts = opts;
+                processOptions();
             }
 
             auto processOptions() {
                 int c = 0;
-                while((c = opts ()) != EOF) {
+                while((c = opts()) != EOF) {
                     switch(c) {
                         case 'r': //Role
                         {
@@ -324,21 +325,51 @@ namespace assakeena {
 
     class TcpServer {
         public:
+            ~TcpServer() {}
+            
+            ACE_INT32 handle_signal(int signum, siginfo_t *s, ucontext_t *u) override;
+
+            TcpServer(auto config) {
+                std::string addr("");
+
+                if(config.ip()) {
+
+                    addr = config.ip();
+                    addr += ":";
+                    addr += std::to_string(config.port());
+                    m_listen.set_address(addr.c_str(), addr.length());
+
+                } else {
+
+                    m_listen.set_port_number(config.port());
+
+                }
+
+                /* Start listening for incoming connection */
+                int reuse_addr = 1;
+                if(m_server.open(m_listen, reuse_addr)) {
+                    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [TcpServer:%t] %M %N:%l Starting of WebServer failed - opening of port: %d hostname: %s\n"), 
+                                m_listen.get_port_number(), m_listen.get_host_name()));
+                }
+
+                handle(m_server.get_handle());
+            }
+
+            ACE_HANDLE handle() const {
+                return(m_handle);
+            }
+
+            void handle(ACE_HANDLE channel) {
+                m_handle = channel;
+            }
+
             auto rx(const std::string& in);
             auto to(auto in);
-            ACE_INT32 handle_signal(int signum, siginfo_t *s, ucontext_t *u) override;
-            TcpServer() {
-                if(ipStr.length()) {
-                    addr = ipStr;
-                    addr += ":";
-                    addr += std::to_string(listenPort);
-                    m_listen.set_address(addr.c_str(), addr.length());
-                } else {
-                    addr = std::to_string(listenPort);
-                    m_listen.set_port_number(listenPort);
-                }
-            }
+            auto tx(std::string out);
+            
+
         private:
+            ACE_HANDLE m_handle;
             ACE_Message_Block m_mb;
             ACE_SOCK_Stream m_stream;
             ACE_INET_Addr m_listen;
@@ -347,6 +378,9 @@ namespace assakeena {
 
     class UnixServer: public ACE_Task<ACE_MT_SYNCH> {
         public:
+            UnixServer(auto config) {}
+            ~UnixServer() {}
+
             int svc(void) override;
             int open(void *args=0) override;
             int close(u_long flags=0) override;
@@ -356,64 +390,100 @@ namespace assakeena {
         private:
     };
 
-    class ConnectionHandler: public ACE_Event_Handler {
+    class ServiceHandler {
         public:
-            ConnectionHandler(auto role) {
-                switch(role) {
+            ServiceHandler(auto config, auto isOveerideConfig, std::vector<std::string> role_list) {
+                switch(config->role()) {
+
                     case Role::UdpClient:
-                        m_role = std::make_unique<UdpClient>();
+                        m_service = std::make_unique<UdpClient>(config);
                     break;
+
                     case Role::TcpClient:
-                        m_role = std::make_unique<TcpClient>();
+                        m_service = std::make_unique<TcpClient>(config);
                     break;
+
                     case Role::UnixClient:
-                        m_role = std::make_unique<UnixClient>();
+                        m_service = std::make_unique<UnixClient>(config);
                     break;
+
                     case Role::TcpServer:
-                        m_role = std::make_unique<TcpServer>();
+                        m_service = std::make_unique<TcpServer>(config);
+                        m_handle = m_service->handle();
+                    break;
+
+                    case Role::UdpServer:
+                        m_service = std::make_unique<UdpServer>(config);
+                    break;
+
+                    case Role::UnixServer:
+                        m_service = std::make_unique<UnixServer>(config);
                     break;
                 }
             }
 
-            ACE_INT32 handle_timeout(const ACE_Time_Value &tv, const void *act=0) override;
-            ACE_INT32 handle_input(ACE_HANDLE handle) override;
-            ACE_INT32 handle_signal(int signum, siginfo_t *s = 0, ucontext_t *u = 0) override;
-            ACE_INT32 handle_close (ACE_HANDLE = ACE_INVALID_HANDLE, ACE_Reactor_Mask = 0) override;
-            ACE_HANDLE get_handle() const override;
-            ACE_INT32 tx(const std::string& rsp, ACE_HANDLE handle);
-            ACE_INT32 start(auto IP, auto Port);
+            //ACE_INT32 handle_timeout(const ACE_Time_Value &tv, const void *act=0) override;
+            //ACE_INT32 handle_input(ACE_HANDLE handle) override;
+            //ACE_INT32 handle_signal(int signum, siginfo_t *s = 0, ucontext_t *u = 0) override;
+            //ACE_INT32 handle_close (ACE_HANDLE = ACE_INVALID_HANDLE, ACE_Reactor_Mask = 0) override;
+            //ACE_HANDLE get_handle() const override;
+            
+            ACE_HANDLE handle() const {
+                return(m_handle);
+            }
+
+            ACE_INT32 tx(const std::string& response, ACE_HANDLE handle);
+            ACE_INT32 start();
             ACE_INT32 stop();
+            ACE_INT32 rx(ACE_HANDLE channel);
 
         private:
+
             long m_timerId;
             ACE_HANDLE m_handle;
             ACE_INET_Addr m_connAddr;
-            std::variant<std::unique_ptr<TcpClient>, std::unique_ptr<UdpClient>, std::unique_ptr<UnixClient>, std::unique_ptr<TcpServer>> m_role;
-
+            std::variant<std::unique_ptr<TcpClient>, std::unique_ptr<UdpClient>, std::unique_ptr<UnixClient>, 
+                        std::unique_ptr<TcpServer>, std::unique_ptr<UdpServer>, std::unique_ptr<UnixServer>> m_service;
 
     };
 
-    class ConnectionsMgr : public ACE_Event_Handler {
+    class UnicloudMgr : public ACE_Event_Handler {
         public:
-            ConnectionsMgr(std::int32_t argc, char* argv[], auto ROLE, auto IP, auto PORT) {
+            UnicloudMgr(std::int32_t argc, char* argv[]) {
                 m_config = std::make_shared<CommandOptions>(argc, argv);
                 
-                if(!ROLE.compare("server")) {
-
+                //arg1 = commandline arguments, arg2 = override arg1 <true|false>, arg3 = list ofservice <tcpserver, udpserver, etc>
+                std::vector<std::string> services = {};
+                std::bool isOverrideConfig = false;
+                ServiceHandler svcHandler(m_config, isOveerideConfig, services);
+                if(!isOveerideConfig) {
+                    auto result = m_services.insert_or_assign(std::make_pair(svcHandler.handle(), svcHandler));
+                    if(result.second) {
+                        //success 
+                    }
                 }
-
+                else {
+                    for(const auto& elm: services) {
+                        ServiceHandler svcHandler(m_config, isOveerideConfig, elm);
+                        auto result = m_services.insert_or_assign(std::make_pair(svcHandler.handle(), svcHandler));
+                        if(result.second) {
+                            //success
+                        }
+                    }
+                }
             }
-            ~ConnectionsMgr() {}
+
+            ~UnicloudMgr() {}
             ACE_INT32 handle_timeout(const ACE_Time_Value &tv, const void *act=0) override;
             ACE_INT32 handle_input(ACE_HANDLE handle) override;
             ACE_INT32 handle_signal(int signum, siginfo_t *s = 0, ucontext_t *u = 0) override;
             ACE_INT32 handle_close (ACE_HANDLE = ACE_INVALID_HANDLE, ACE_Reactor_Mask = 0) override;
-            ACE_HANDLE get_handle() const override;
+            ACE_INT32 start();
+            ACE_INT32 stop();
             
         private:
             
-            std::unordered_map<std::int32_t, ConnectionHandler> m_connections;
-            //std::variant<UdpClient, TcpClient, UnixClient, UdpServer, TcpServer, UnixServer> m_role;
+            std::unordered_map<std::int32_t, ServiceHandler> m_services;
             std::shared_ptr<CommandOptions> m_config;
     }
 

@@ -14,10 +14,61 @@
 
 #include "shell.hpp"
 
-ACE_INT32 assakeena::ConnectionHandler::handle_timeout(const ACE_Time_Value &tv, const void *act) {
+ACE_INT32 assakeena::UnicloudMgr::handle_input(ACE_HANDLE channel) {
+
+    if(m_services.contains(channel)) {
+      m_services.at(channel).rx(channel);
+    }
 
 }
-ACE_INT32 assakeena::ConnectionHandler::tx(const std::string &rsp, ACE_HANDLE handle) {
+
+ACE_INT32 assakeena::UnicloudMgr::handle_timeout(const ACE_Time_Value &tv, const void *act) {
+  return(0);
+}
+
+ACE_INT32 assakeena::UnicloudMgr::handle_signal(int signum, siginfo_t *s , ucontext_t *u) {
+  return(0);
+}
+
+ACE_INT32 assakeena::UnicloudMgr::handle_close (ACE_HANDLE channel, ACE_Reactor_Mask mask) {
+  return(0);
+}
+
+ACE_INT32 assakeena::UnicloudMgr::start() {
+
+    /* subscribe for signal */
+    ACE_Sig_Set ss;
+    ss.empty_set();
+    ss.sig_add(SIGINT);
+    ss.sig_add(SIGTERM);
+
+    ACE_Reactor::instance()->register_handler(&ss, this); 
+
+    for(auto const& elm: m_services) {
+        auto channel = elm->first;
+        ACE_Reactor::instance()->register_handler(channel, this, ACE_Event_Handler::ACCEPT_MASK | 
+                                                                 ACE_Event_Handler::TIMER_MASK |
+                                                                 ACE_Event_Handler::SIGNAL_MASK); 
+    }
+
+    ACE_Time_Value to(0,10);
+
+    while(true) {
+        ACE_INT32 ret = ACE_Reactor::instance()->handle_events(to);
+        if(ret < 0) break;
+    }
+
+    ACE_Reactor::instance()->remove_handler(ss); 
+    return(0);
+}
+
+ACE_INT32 assakeena::UnicloudMgr::stop() {
+    return(0);
+}
+
+//Service Handler ==================================>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+ACE_INT32 assakeena::ServiceHandler::tx(const std::string &rsp, ACE_HANDLE handle) {
     std::int32_t  toBeSent = rsp.length();
     std::int32_t offset = 0;
     ACE_INT32 ret = -1;
@@ -36,7 +87,7 @@ ACE_INT32 assakeena::ConnectionHandler::tx(const std::string &rsp, ACE_HANDLE ha
     return(ret);
 }
 
-ACE_INT32 assakeena::ConnectionHandler::handle_input(ACE_HANDLE handle) {
+ACE_INT32 assakeena::ServiceHandler::rx(ACE_HANDLE handle) {
     std::int32_t ret = -1;
     fd_set rd_fd;
     FD_ZERO(&rd_fd);
@@ -287,7 +338,9 @@ std::string Http::get_body(const std::string& in)
 
 int main(std::int32_t argc, char *argv[]) {
 
-    assakeena::Unicloud shell;
+    ACE_LOG_MSG->open(argv[0], ACE_LOG_MSG->STDERR|ACE_LOG_MSG->SYSLOG);
+    assakeena::UnicloudMgr unicloud;
+
     int ret = pipe(shell.fds().at(assakeena::FDs::READ).data());
 
     if(ret < 0) {
