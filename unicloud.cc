@@ -169,19 +169,25 @@ auto assakeena::TcpClient::time_out(const auto& in) {
 }
 
 
-//TCP Server ==================>>>>>
-int assakeena::TcpServer::svc(void) {
+//TCP Connection ==================>>>>>
+int assakeena::TcpConnections::svc(void) {
+  ACE_Message_Block *mb = nullptr;
+  
+  while() {
 
+  }
+
+  return(0);
 }
 
-int assakeena::TcpServer::open(void *args) {
+int assakeena::TcpConnection::open(void *args) {
     ACE_UNUSED_ARG(arg);
     /*! Number of threads are 1, which is 2nd argument. by default  it's 1.*/
-    activate();
+    activate(THR_NEW_LWP, m_thread_count);
     return(0);
 }
 
-int assakeena::TcpServer::close(u_long flags) {
+int assakeena::TcpConnection::close(u_long flags) {
     ACE_UNUSED_ARG(flag);
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Micro service is closing\n")));
     return(0);
@@ -221,7 +227,12 @@ ACE_INT32 assakeena::TcpServer::handle_input(ACE_HANDLE handle) {
         }
     } else {
         //existing client connection 
+        try {
+            auto it = m_connections[handle];
+            it->second->rx();
+        } catch (...) {
 
+        }
     }
 }
 

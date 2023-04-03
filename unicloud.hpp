@@ -351,6 +351,22 @@ namespace assakeena {
                 }
             }
 
+            std::uint32_t selfIP() const {
+                try {
+                    return(std::stoi(m_commandArgumentValue[CommandArgument::SelfIp]));
+                } catch(...) {
+                    return(0);
+                }
+            }
+
+            std::uint32_t selfPORT() const {
+                try {
+                    return(std::stoi(m_commandArgumentValue[CommandArgument::SelfPort]));
+                } catch(...) {
+                    return(0);
+                }
+            }
+
         private:
             /* The last argument tells from where to start in argv - offset of argv array */
             ACE_Get_Opt m_opts;
@@ -430,6 +446,33 @@ namespace assakeena {
 
             ACE_INT32 handle_signal(int signum, siginfo_t *s, ucontext_t *u) override;
         private:
+
+    };
+
+    class TcpConnection : public ACE_Task<ACE_MT_SYNCH> {
+        public:
+            TcpConnection(std::int32_t thread_num=3) : m_thread_count(thread_num), 
+                m_rx_byte(0), 
+                m_rx_count(0), 
+                m_tx_byte(0),
+                m_tx_count(0) {}
+                
+            ~TcpConnection() {}
+            int svc(void) override;
+            int open(void *args=0) override;
+            int close(u_long flags=0) override;
+
+            std::int32_t rx(ACE_HANDLE channel);
+            std::int32_t tx(ACE_HANDLE channel, std::string rsp);
+            std::double start_timer(std::int32_t to);
+            std::double stop_timer();
+        private:
+            std::int32_t m_thread_count;
+            std::int32_t m_rx_byte;
+            std::int32_t m_rx_count;
+            std::int32_t m_tx_byte;
+            std::int32_t m_tx_count;
+
 
     };
 
