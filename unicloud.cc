@@ -175,10 +175,65 @@ int assakeena::TcpServer::svc(void) {
 }
 
 int assakeena::TcpServer::open(void *args) {
-
+    ACE_UNUSED_ARG(arg);
+    /*! Number of threads are 1, which is 2nd argument. by default  it's 1.*/
+    activate();
+    return(0);
 }
 
 int assakeena::TcpServer::close(u_long flags) {
+    ACE_UNUSED_ARG(flag);
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Micro service is closing\n")));
+    return(0);
+}
+
+ACE_INT32 assakeena::TcpServer::handle_timeout(const ACE_Time_Value &tv, const void *act) {
+
+}
+
+ACE_INT32 assakeena::TcpServer::handle_input(ACE_HANDLE handle) {
+    ACE_UNUSED_ARG(handle);
+    int ret_status = 0;
+    ACE_SOCK_Stream peer_stream;
+    ACE_INET_Addr peer_addr;
+
+    if(handle == handle()) {
+        //new client connection 
+        auto ret_status = m_server.accept(peer_stream, &peer_addr);
+
+        if(!ret_status) {
+            // New Connection isaccepted 
+            TcpClient clnt = std::make_unique<TcpClient>();
+            clnt->handle(peer_stream.get_handle());
+            auto result = m_connections.insert_or_assign(std::make_pair(peer_stream.get_handle(), std::move(clnt)));
+
+            if(!result->second) {
+              //Error
+              ACE_ERROR((LM_ERROR, ACE_TEXT("%D [TcpServer:%t] %M %N:%l insert_or_assing to unordered_map is failed\n")));
+              close(peer_stream.get_handle());
+              // If insertion to STL is failed then clnt shouldn't be moved and it will go out of scope and memory will be freed.
+            } else {
+                ACE_Reactor::instance()->register_handler(peer_stream.get_handle(), this, 
+                                                      ACE_Event_Handler::READ_MASK |
+                                                      ACE_Event_Handler::TIMER_MASK | 
+                                                      ACE_Event_Handler::SIGNAL_MASK);
+            }
+        }
+    } else {
+        //existing client connection 
+
+    }
+}
+
+ACE_INT32 assakeena::TcpServer::handle_signal(int signum, siginfo_t *s, ucontext_t *u) {
+
+}
+
+ACE_INT32 assakeena::TcpServer::handle_close (ACE_HANDLE channel, ACE_Reactor_Mask mask) {
+
+}
+
+ACE_HANDLE get_handle() const {
 
 }
 
@@ -195,7 +250,28 @@ auto assakeena::TcpServer::to(auto in) {
 }
 
 auto assakeena::TcpServer::tx(std::string out) {
-  
+
+}
+
+auto assakeena::TcpServer::start() {
+    /* subscribe for signal */
+    ACE_Sig_Set ss;
+    ss.empty_set();
+    ss.sig_add(SIGINT);
+    ss.sig_add(SIGTERM);
+
+    ACE_Reactor::instance()->register_handler(&ss, this); 
+
+    for(auto const& elm: m_services) {
+        auto channel = elm->first;
+        ACE_Reactor::instance()->register_handler(handle(), this, ACE_Event_Handler::ACCEPT_MASK | 
+                                                                  ACE_Event_Handler::TIMER_MASK  |
+                                                                  ACE_Event_Handler::SIGNAL_MASK); 
+    }
+}
+
+auto stop() {
+
 }
 
 // HTTP =====================

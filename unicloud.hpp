@@ -20,7 +20,9 @@ namespace assakeena {
         UnixClient = 2,
         UdpServer = 3,
         TcpServer = 4,
-        UnixServer = 5
+        UnixServer = 5,
+        ShellCommandHandler = 6,
+        All = 7
     };
 
     enum class CommandArgument: std::int32_t {
@@ -29,6 +31,10 @@ namespace assakeena {
         ServerIp,
         ServerPort,
         ConnectionRetryInterval,
+        ResponseTimeout,
+        ConnectionRetryTimeout,
+        ConnectionRetryCount,
+        ConnectionCloseTimeout,
         Help
     };
 
@@ -36,11 +42,12 @@ namespace assakeena {
     class TcpClient;
     class UnixClient;
     class CommandOptions;
-    class ConnectionHandler;
+    class ServiceHandler;
+    class UnicloudMgr;
 
-    class Unicloud;
+    class ShellCommandHandler;
 
-    class Unicloud {
+    class ShellCommandHandler {
         public:
             Unicloud() {
                 m_fds = {{0, 0}, {0, 0}};
@@ -166,14 +173,17 @@ namespace assakeena {
              * @param argv 
              */
             void config(std::int32_t argc, char* argv[]) {
-                ACE_Get_Opt opts(argc, argv, ACE_TEXT ("r:f:i:p:a:h:"), 1);
+                ACE_Get_Opt opts(argc, argv, ACE_TEXT ("r:f:i:p:c:o:n:e:h:"), 1);
 
-                opts.long_option(ACE_TEXT("role"),                      'r', ACE_Get_Opt::ARG_REQUIRED);
-                opts.long_option(ACE_TEXT("protocol"),                  'f', ACE_Get_Opt::ARG_REQUIRED);
-                opts.long_option(ACE_TEXT("server-ip"),                 'i', ACE_Get_Opt::ARG_REQUIRED);
-                opts.long_option(ACE_TEXT("server-port"),               'p', ACE_Get_Opt::ARG_REQUIRED);
-                opts.long_option(ACE_TEXT("connection-retry-interval"), 'c', ACE_Get_Opt::ARG_REQUIRED);
-                opts.long_option(ACE_TEXT("help"),                      'h', ACE_Get_Opt::ARG_REQUIRED);
+                opts.long_option(ACE_TEXT("role"),                            'r', ACE_Get_Opt::ARG_REQUIRED);
+                opts.long_option(ACE_TEXT("protocol"),                        'f', ACE_Get_Opt::ARG_REQUIRED);
+                opts.long_option(ACE_TEXT("server-ip"),                       'i', ACE_Get_Opt::ARG_REQUIRED);
+                opts.long_option(ACE_TEXT("server-port"),                     'p', ACE_Get_Opt::ARG_REQUIRED);
+                opts.long_option(ACE_TEXT("connection-retry-count"),          'n', ACE_Get_Opt::ARG_REQUIRED);
+                opts.long_option(ACE_TEXT("response-timeout-in-ms"),          'e', ACE_Get_Opt::ARG_REQUIRED);
+                opts.long_option(ACE_TEXT("connection-retry-timeout-in-ms"),  'c', ACE_Get_Opt::ARG_REQUIRED);
+                opts.long_option(ACE_TEXT("connection-close-timeout-in-ms"),  'o', ACE_Get_Opt::ARG_REQUIRED);
+                opts.long_option(ACE_TEXT("help"),                            'h', ACE_Get_Opt::ARG_REQUIRED);
 
                 m_opts = opts;
                 processOptions();
@@ -186,7 +196,8 @@ namespace assakeena {
                         case 'r': //Role
                         {
                             auto role_value = std::string(opts.opt_arg());
-                            if(!role_value.compare("client") || !role_value.compare("server")) {
+                            if(!role_value.compare("client") || !role_value.compare("server") || !role_value.compare("all") ||
+                               !role_value.compare("shell-command")) {
                                 m_commandArgumentValue.insert(std::make_pair(CommandArgument::Role, std::string(opts.opt_arg())));
                                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [config:%t] %M %N:%l Role %s\n"), m_commandArgumentValue[CommandArgument::Role]));
                             }
@@ -209,7 +220,7 @@ namespace assakeena {
 
                         case 'f': //Protocol
                             auto protocol = std::string(opts.opt_arg());
-                            if(protocol.compare("tcp") || protocol.compare("udp") || protocol.compare("unix")) {
+                            if(!protocol.compare("tcp") || !protocol.compare("udp") || !protocol.compare("unix") || !protocol.compare("all")) {
                                 m_commandArgumentValue.insert(std::make_pair(CommandArgument::Protocol, std::string(opts.opt_arg())));
                                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [config:%t] %M %N:%l Protocol: %s\n"), m_commandArgumentValue[CommandArgument::Protocol]));
                             }
@@ -220,15 +231,33 @@ namespace assakeena {
                             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [config:%t] %M %N:%l Connection Retry Interval: %s\n"), m_commandArgumentValue[CommandArgument::ConnectionRetryInterval]));
                         break;
 
+                        case 'o': //Connection-close-timeout
+                            m_commandArgumentValue.insert(std::make_pair(CommandArgument::ConnectionCloseTimeout, std::string(opts.opt_arg())));
+                            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [config:%t] %M %N:%l Connection Close Timeout: %s\n"), m_commandArgumentValue[CommandArgument::ConnectionCloseTimeout]));
+                        break;
+
+                        case 'n' //connection-retry-count
+                            m_commandArgumentValue.insert(std::make_pair(CommandArgument::ConnectionRetryCount, std::string(opts.opt_arg())));
+                            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [config:%t] %M %N:%l Connection Retry Count: %s\n"), m_commandArgumentValue[CommandArgument::ConnectionRetryCount]));
+                        break;
+
+                        case 'e': //response-timeout
+                            m_commandArgumentValue.insert(std::make_pair(CommandArgument::ConnectionRetryInterval, std::string(opts.opt_arg())));
+                            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [config:%t] %M %N:%l Connection Retry Interval: %s\n"), m_commandArgumentValue[CommandArgument::ConnectionRetryInterval]));
+                        break;
+
                         case 'h': //Help
                         default:
                             ACE_ERROR_RETURN ((LM_ERROR,
                                 ACE_TEXT("%D [Config:%t] %M %N:%l usage: %s\n"
                                 " [-i --server-ip]\n"
                                 " [-p --server-port]\n"
-                                " [-r --role {client|server}]\n"
-                                " [-f --protocol {tcp|udp|unix}\n"
+                                " [-r --role {client|server|shell-command-handler|all}]\n"
+                                " [-f --protocol {tcp|udp|unix|all}\n"
                                 " [-c --connection-retry-interval {For client role}\n"
+                                " [-o --connection-close-timeout-in-ms {For tcp server}\n"
+                                " [-n --connection-retry-count {For tcp client}\n"
+                                " [-e --response-timeout-in-ms {Applicable to all}\n"
                                 " [-h --help]\n"), argv [0]), -1);
                     }
                 }
@@ -261,7 +290,7 @@ namespace assakeena {
             std::string protocol() const {
                 try {
                     return(m_commandArgumentValue[CommandArgument::ProtocolType]);
-                }catch(...) {
+                } catch(...) {
                     return(std::string());
                 }
             }
@@ -269,8 +298,40 @@ namespace assakeena {
             std::uint32_t connectionRetryInterval() const {
                 try {
                     return(std::stoi(m_commandArgumentValue[CommandArgument::ConnectionRetryInterval]));
-                }catch(...) {
-                    return(std::string());
+                } catch(...) {
+                    return(0);
+                }
+            }
+
+            std::uint32_t connectionRetryCount() const {
+                try {
+                    return(std::stoi(m_commandArgumentValue[CommandArgument::ConnectionRetryCount]));
+                } catch(...) {
+                    return(0);
+                }
+            }
+
+            std::uint32_t connectionRetryTimeout() const {
+                try {
+                    return(std::stoi(m_commandArgumentValue[CommandArgument::ConnectionRetryTimeout]));
+                } catch(...) {
+                    return(0);
+                }
+            }
+
+            std::uint32_t responseTimeout() const {
+                try {
+                    return(std::stoi(m_commandArgumentValue[CommandArgument::ResponseTimeout]));
+                } catch(...) {
+                    return(0);
+                }
+            }
+
+            std::uint32_t connectionCloseTimeout() const {
+                try {
+                    return(std::stoi(m_commandArgumentValue[CommandArgument::ConnectionCloseTimeout]));
+                } catch(...) {
+                    return(0);
                 }
             }
 
@@ -293,12 +354,45 @@ namespace assakeena {
 
     class TcpClient {
         public:
+            TcpClient() {
+
+            }
+            ~TcpClient() {
+
+            }
+
             auto rx(const std::string& in);
-            auto to(auto in);
+            auto start_timer(auto in);
+            auto stop_timer(auto in);
             auto start(const std::string& IP, const std::uint32_t &port);
             auto stop();
-        private:    
+
+            //ACE_INT32 handle_timeout(const ACE_Time_Value &tv, const void *act=0) override;
+            //ACE_INT32 handle_input(ACE_HANDLE handle) override;
+            //ACE_INT32 handle_signal(int signum, siginfo_t *s = 0, ucontext_t *u = 0) override;
+            //ACE_INT32 handle_close (ACE_HANDLE = ACE_INVALID_HANDLE, ACE_Reactor_Mask = 0) override;
+            //ACE_HANDLE get_handle() const override;
+
+            void handle(ACE_HANDLE channel) {
+                m_handle = channel;
+            }
+
+            ACE_HANDLE handle() const {
+                return(m_handle);
+            }
             
+            auto peer_address(auto addr) {
+                m_addr = addr;
+            }
+
+            ACE_INET_Addr addr() const {
+                return(m_addr);
+            }
+
+        private:    
+            ACE_HANDLE m_handle;
+            ACE_INET_Addr m_addr;
+            long m_timerId;
     };
 
     class UnixClient: public ACE_Task<ACE_MT_SYNCH> {
@@ -323,15 +417,13 @@ namespace assakeena {
 
     };
 
-    class TcpServer : public ACE_Task<ACE_MT_SYNCH> {
+    class TcpServer : public ACE_Event_Handler {
         public:
             ~TcpServer() {}
             
             ACE_INT32 handle_signal(int signum, siginfo_t *s, ucontext_t *u) override;
-            int svc(void) override;
-            int open(void *args=0) override;
-            int close(u_long flags=0) override;
             
+
             TcpServer(auto config) {
                 std::string addr("");
 
@@ -366,10 +458,17 @@ namespace assakeena {
                 m_handle = channel;
             }
 
+            ACE_INT32 handle_timeout(const ACE_Time_Value &tv, const void *act=0) override;
+            ACE_INT32 handle_input(ACE_HANDLE handle) override;
+            ACE_INT32 handle_signal(int signum, siginfo_t *s = 0, ucontext_t *u = 0) override;
+            ACE_INT32 handle_close (ACE_HANDLE = ACE_INVALID_HANDLE, ACE_Reactor_Mask = 0) override;
+            ACE_HANDLE get_handle() const override;
+
             auto rx(const std::string& in);
             auto to(auto in);
             auto tx(std::string out);
-            
+            auto start();
+            auto stop();
 
         private:
             ACE_HANDLE m_handle;
@@ -377,6 +476,7 @@ namespace assakeena {
             ACE_SOCK_Stream m_stream;
             ACE_INET_Addr m_listen;
             ACE_SOCK_Acceptor m_server;
+            std::unordered_map<ACE_HANDLE, std::unique_ptr<TcpClient>> m_connections;
     };
 
     class UnixServer: public ACE_Task<ACE_MT_SYNCH> {
@@ -395,8 +495,8 @@ namespace assakeena {
 
     class ServiceHandler {
         public:
-            ServiceHandler(auto config, auto isOveerideConfig, std::vector<std::string> role_list) {
-                switch(config->role()) {
+            ServiceHandler(auto role, auto config) {
+                switch(role()) {
 
                     case Role::UdpClient:
                         m_service = std::make_unique<UdpClient>(config);
@@ -461,9 +561,7 @@ namespace assakeena {
                 m_config = std::make_shared<CommandOptions>(argc, argv);
                 
                 //arg1 = commandline arguments, arg2 = override arg1 <true|false>, arg3 = list ofservice <tcpserver, udpserver, etc>
-                std::vector<std::string> services = {};
-                std::bool isOverrideConfig = false;
-                ServiceHandler svcHandler(m_config, isOveerideConfig, services);
+                ServiceHandler svcHandler(m_config);
                 if(!isOveerideConfig) {
                     auto result = m_services.insert_or_assign(std::make_pair(svcHandler.handle(), svcHandler));
                     if(result.second) {
