@@ -35,6 +35,8 @@ namespace assakeena {
         ConnectionRetryTimeout,
         ConnectionRetryCount,
         ConnectionCloseTimeout,
+        SelfIp,
+        SelfPort,
         Help
     };
 
@@ -173,12 +175,14 @@ namespace assakeena {
              * @param argv 
              */
             void config(std::int32_t argc, char* argv[]) {
-                ACE_Get_Opt opts(argc, argv, ACE_TEXT ("r:f:i:p:c:o:n:e:h:"), 1);
+                ACE_Get_Opt opts(argc, argv, ACE_TEXT ("r:f:i:p:c:o:n:e:s:l:h:"), 1);
 
                 opts.long_option(ACE_TEXT("role"),                            'r', ACE_Get_Opt::ARG_REQUIRED);
                 opts.long_option(ACE_TEXT("protocol"),                        'f', ACE_Get_Opt::ARG_REQUIRED);
                 opts.long_option(ACE_TEXT("server-ip"),                       'i', ACE_Get_Opt::ARG_REQUIRED);
                 opts.long_option(ACE_TEXT("server-port"),                     'p', ACE_Get_Opt::ARG_REQUIRED);
+                opts.long_option(ACE_TEXT("self-ip"),                         's', ACE_Get_Opt::ARG_REQUIRED);
+                opts.long_option(ACE_TEXT("self-port"),                       'l', ACE_Get_Opt::ARG_REQUIRED);
                 opts.long_option(ACE_TEXT("connection-retry-count"),          'n', ACE_Get_Opt::ARG_REQUIRED);
                 opts.long_option(ACE_TEXT("response-timeout-in-ms"),          'e', ACE_Get_Opt::ARG_REQUIRED);
                 opts.long_option(ACE_TEXT("connection-retry-timeout-in-ms"),  'c', ACE_Get_Opt::ARG_REQUIRED);
@@ -242,8 +246,18 @@ namespace assakeena {
                         break;
 
                         case 'e': //response-timeout
-                            m_commandArgumentValue.insert(std::make_pair(CommandArgument::ConnectionRetryInterval, std::string(opts.opt_arg())));
-                            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [config:%t] %M %N:%l Connection Retry Interval: %s\n"), m_commandArgumentValue[CommandArgument::ConnectionRetryInterval]));
+                            m_commandArgumentValue.insert(std::make_pair(CommandArgument::ResponseTimeout, std::string(opts.opt_arg())));
+                            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [config:%t] %M %N:%l Connection Retry Interval: %s\n"), m_commandArgumentValue[CommandArgument::ResponseTimeout]));
+                        break;
+
+                        case 's': //self-ip
+                            m_commandArgumentValue.insert(std::make_pair(CommandArgument::SelfIp, std::string(opts.opt_arg())));
+                            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [config:%t] %M %N:%l Self IP: %s\n"), m_commandArgumentValue[CommandArgument::SelfIp]));
+                        break;
+
+                        case 'l': //self-port
+                            m_commandArgumentValue.insert(std::make_pair(CommandArgument::SelfPort, std::string(opts.opt_arg())));
+                            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [config:%t] %M %N:%l Self PORT: %s\n"), m_commandArgumentValue[CommandArgument::SelfPort]));
                         break;
 
                         case 'h': //Help
@@ -258,6 +272,8 @@ namespace assakeena {
                                 " [-o --connection-close-timeout-in-ms {For tcp server}\n"
                                 " [-n --connection-retry-count {For tcp client}\n"
                                 " [-e --response-timeout-in-ms {Applicable to all}\n"
+                                " [-s --self-ip   {}\n"
+                                " [-l --self-port {}\n"
                                 " [-h --help]\n"), argv [0]), -1);
                     }
                 }
@@ -496,7 +512,7 @@ namespace assakeena {
     class ServiceHandler {
         public:
             ServiceHandler(auto role, auto config) {
-                switch(role()) {
+                switch(role) {
 
                     case Role::UdpClient:
                         m_service = std::make_unique<UdpClient>(config);
@@ -561,21 +577,17 @@ namespace assakeena {
                 m_config = std::make_shared<CommandOptions>(argc, argv);
                 
                 //arg1 = commandline arguments, arg2 = override arg1 <true|false>, arg3 = list ofservice <tcpserver, udpserver, etc>
-                ServiceHandler svcHandler(m_config);
-                if(!isOveerideConfig) {
+                
+                auto _role = m_config.role();
+                if(_role.compare("all")) {
+                    ServiceHandler svcHandler(_role, m_config);
                     auto result = m_services.insert_or_assign(std::make_pair(svcHandler.handle(), svcHandler));
                     if(result.second) {
                         //success 
                     }
-                }
-                else {
-                    for(const auto& elm: services) {
-                        ServiceHandler svcHandler(m_config, isOveerideConfig, elm);
-                        auto result = m_services.insert_or_assign(std::make_pair(svcHandler.handle(), svcHandler));
-                        if(result.second) {
-                            //success
-                        }
-                    }
+                } else {
+                    // configure all service Handler i.e. tcpClient/Server,UdpClient/Server,UnixClient/Server, Shell-Command-Handler 
+                    
                 }
             }
 
