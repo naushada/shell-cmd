@@ -1,18 +1,7 @@
 #ifndef __unicloud_cc__
 #define __unicloud_cc__
 
-
-#include <unistd.h>
-#include <string.h>
-#include <stdio.h>
-#include <vector>
-#include <array>
-#include <iostream>
-#include <cstdio>
-#include <sstream>
-#include <thread>
-
-#include "shell.hpp"
+#include "unicloud.hpp"
 
 ACE_INT32 assakeena::UnicloudMgr::handle_input(ACE_HANDLE channel) {
 
@@ -45,7 +34,7 @@ ACE_INT32 assakeena::UnicloudMgr::start() {
     ACE_Reactor::instance()->register_handler(&ss, this); 
 
     for(auto const& elm: m_services) {
-        auto channel = elm->first;
+        auto channel = elm.first;
         ACE_Reactor::instance()->register_handler(channel, this, ACE_Event_Handler::ACCEPT_MASK | 
                                                                  ACE_Event_Handler::TIMER_MASK |
                                                                  ACE_Event_Handler::SIGNAL_MASK); 
@@ -145,74 +134,166 @@ ACE_HANDLE assakeena::ServiceHandler::start() {
 
 }
 
-// TCP Client ==========================>>>>>
-/**
- * @brief 
- * 
- * @param in 
- * @return auto 
- */
-auto assakeena::TcpClient::rx(const std::vector<std::string>& in) {
-    std::string rsp;
-    if(in.empty()) {
-        //empty string
-        return(std::string());
-    }
-    //process the Request
-    Http http(in);
+
+//TCP Connection Task ==================>>>>>
+
+ACE_INT32 assakeena::TcpConnectionTask::tx(const std::string &rsp, ACE_HANDLE handle) {
+    std::int32_t  toBeSent = rsp.length();
+    std::int32_t offset = 0;
+    ACE_INT32 ret = -1;
+
+    do {
+        ret = send(handle, (rsp.c_str() + offset), (toBeSent - offset), 0);
+        if(ret < 0) {
+            ACE_ERROR((LM_ERROR, ACE_TEXT("%D [ConnectionHandler:%t] %M %N:%l sent to peer is failed\n")));
+            break;
+        }
+        offset += ret;
+        ret = 0;
+
+    } while((toBeSent != offset));
     
-    return(rsp);
+    return(ret);
 }
 
-auto assakeena::TcpClient::time_out(const auto& in) {
+ACE_INT32 assakeena::TcpConnectionTask::rx(ACE_HANDLE handle) {
+
+    std::int32_t ret = -1;
+    fd_set rd_fd;
+    FD_ZERO(&rd_fd);
+    std::vector<std::string> req;
+    req.clear();
+
+    while(true) {
+        struct timeval to = {0, 10};
+        FD_SET(handle, &rd_fd);
+
+        ret = select((handle + 1), &rd_fd, NULL, NULL, &to);
+        if(!ret) {
+
+            //Timeout happens
+            if(!req.empty()) {
+
+                for(const auto& elm: req) {
+                    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [TcpConnectionTask:%t] %M %N:%l handle: %d request: %s\n"), handle, elm.c_str()));
+                }
+
+                std::string request_str("");
+                for(auto it = req.begin(); it != req.end(); ++it) {
+                    request_str += *it;
+                }
+
+                auto resp = process_request(request_str);
+                auto ret = tx(resp, handle);
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [TcpConnectionTask:%t] %M %N:%l handle: %d response: %s\n"), handle, resp.c_str()));
+            }
+
+            //going out of while loop.
+            break;
+
+        } else if(ret < 0) {
+            //error has happened
+        } else if(FD_ISSET(handle, &rd_fd)) {
+
+            std::array<std::int8_t, 1024> in;
+            in.fill(0);
+            auto len = recv(handle, in.data(), in.size(), 0);
+
+            if(len > 0) {
+                std::string ss(reinterpret_cast<const char *>(in.data()), len);
+                req.push_back(ss);
+            } else if(!len) {
+                //connection is closed
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [TcpConnectionTask:%t] %M %N:%l connection close handle: %s\n"), handle));
+                close(handle);
+                return(0);
+            }
+        }
+    }
+}
+
+std::string assakeena::TcpConnectionTask::process_request(const std::string& req) {
+    Http http(req);
+    //the supported methods are GET/POST/PUT/DELETE/CONENCT/OPTIONS
+    if(!(http.method().compare("GET")) || !(http.method().compare("POST")) ||
+       !(http.method().compare("PUT")) || !(http.method().compare("DELETE")) ||
+       !(http.method().compare("CONNECT")) || !(http.method().compare("OPTIONS"))) {
+        
+        // Match found for HTTP Method
+        if(!http.method().compare("GET")) {
+            //Handle HTTP GET Request
+            auto fn = m_uri_map[http.uri()];
+            auto response = fn(req)
+
+        } else if(!http.method().compare("POST")) {
+            // Match found for HTTP Method
+            auto fn = m_uri_map[http.uri()];
+            auto response = fn(req)
+        }
+    }
 
 }
 
+int assakeena::TcpConnectionTask::svc(void) {
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [TcpConnectionTask:%t] %M %N:%l Micro service is spawned\n")));
+    /*
+       All of the threads will block here until the last thread
+       arrives.  They will all then be free to begin doing work.
+     */
+    m_barrier->wait();
 
-//TCP Connection ==================>>>>>
-int assakeena::TcpConnections::svc(void) {
-  ACE_Message_Block *mb = nullptr;
-  
-  while() {
+    ACE_Message_Block *mb = nullptr;
+
+  while(-1 != getq(mb)) {
+      auto channel = mb->rd_ptr();
+      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [TcpConnectionTask:%t] %M %N:%l channel %d\n"), channel));
 
   }
 
   return(0);
 }
 
-int assakeena::TcpConnection::open(void *args) {
-    ACE_UNUSED_ARG(arg);
+int assakeena::TcpConnectionTask::open(void *args) {
+    ACE_UNUSED_ARG(args);
+    m_barrier = std::make_unique<ACE_Barrier>(m_thread_count);
+
     /*! Number of threads are 1, which is 2nd argument. by default  it's 1.*/
     activate(THR_NEW_LWP, m_thread_count);
     return(0);
 }
 
-int assakeena::TcpConnection::close(u_long flags) {
-    ACE_UNUSED_ARG(flag);
+int assakeena::TcpConnectionTask::close(u_long flags) {
+    ACE_UNUSED_ARG(flags);
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Micro service is closing\n")));
     return(0);
 }
 
+///////////////// TCP Server
 ACE_INT32 assakeena::TcpServer::handle_timeout(const ACE_Time_Value &tv, const void *act) {
 
 }
 
-ACE_INT32 assakeena::TcpServer::handle_input(ACE_HANDLE handle) {
-    ACE_UNUSED_ARG(handle);
+ACE_INT32 assakeena::TcpServer::handle_input(ACE_HANDLE channel) {
+
     int ret_status = 0;
     ACE_SOCK_Stream peer_stream;
     ACE_INET_Addr peer_addr;
 
-    if(handle == handle()) {
+    if(channel == handle()) {
         //new client connection 
         auto ret_status = m_server.accept(peer_stream, &peer_addr);
 
         if(!ret_status) {
             // New Connection isaccepted 
-            TcpClient clnt = std::make_unique<TcpClient>();
-            clnt->handle(peer_stream.get_handle());
-            auto result = m_connections.insert_or_assign(std::make_pair(peer_stream.get_handle(), std::move(clnt)));
-
+            //TcpClient clnt = std::make_unique<TcpClient>();
+            //clnt->handle(peer_stream.get_handle());
+            //auto result = m_connections.insert_or_assign(std::make_pair(peer_stream.get_handle(), std::move(clnt)));
+            m_connected_clients.push_back(peer_stream.get_handle());
+            ACE_Reactor::instance()->register_handler(peer_stream.get_handle(), this, 
+                                                      ACE_Event_Handler::READ_MASK |
+                                                      ACE_Event_Handler::TIMER_MASK | 
+                                                      ACE_Event_Handler::SIGNAL_MASK);
+            #if 0                                          
             if(!result->second) {
               //Error
               ACE_ERROR((LM_ERROR, ACE_TEXT("%D [TcpServer:%t] %M %N:%l insert_or_assing to unordered_map is failed\n")));
@@ -224,12 +305,19 @@ ACE_INT32 assakeena::TcpServer::handle_input(ACE_HANDLE handle) {
                                                       ACE_Event_Handler::TIMER_MASK | 
                                                       ACE_Event_Handler::SIGNAL_MASK);
             }
+            #endif
         }
     } else {
         //existing client connection 
         try {
-            auto it = m_connections[handle];
-            it->second->rx();
+            //auto it = m_connections[handle];
+            //it->second->rx();
+            auto found = std::find_if(m_connected_clients.begin(), m_connected_clients.end(), [channel](std::int32_t fd) {return(channel == fd);});
+            if(m_connected_clients.end() != found) {
+                //std::unique_ptr<ACE_Message_Block>mb;
+                ACE_Message_Block *mb;
+                m_task->putq(std::move(mb));
+            }
         } catch (...) {
 
         }
@@ -244,26 +332,6 @@ ACE_INT32 assakeena::TcpServer::handle_close (ACE_HANDLE channel, ACE_Reactor_Ma
 
 }
 
-ACE_HANDLE get_handle() const {
-
-}
-
-ACE_INT32 assakeena::TcpServer::handle_signal(int signum, siginfo_t *s, ucontext_t *u) {
-
-}
-
-auto assakeena::TcpServer::rx(const std::string& in) {
-
-}
-
-auto assakeena::TcpServer::to(auto in) {
-
-}
-
-auto assakeena::TcpServer::tx(std::string out) {
-
-}
-
 auto assakeena::TcpServer::start() {
     /* subscribe for signal */
     ACE_Sig_Set ss;
@@ -272,17 +340,14 @@ auto assakeena::TcpServer::start() {
     ss.sig_add(SIGTERM);
 
     ACE_Reactor::instance()->register_handler(&ss, this); 
-
-    for(auto const& elm: m_services) {
-        auto channel = elm->first;
-        ACE_Reactor::instance()->register_handler(handle(), this, ACE_Event_Handler::ACCEPT_MASK | 
-                                                                  ACE_Event_Handler::TIMER_MASK  |
-                                                                  ACE_Event_Handler::SIGNAL_MASK); 
-    }
+    ACE_Reactor::instance()->register_handler(handle(), this, ACE_Event_Handler::ACCEPT_MASK | 
+                                                              ACE_Event_Handler::TIMER_MASK  |
+                                                              ACE_Event_Handler::SIGNAL_MASK); 
+    return(0);
 }
 
-auto stop() {
-
+auto assakeena::TcpServer::stop() {
+    return(0);
 }
 
 // HTTP =====================
@@ -510,7 +575,12 @@ int main(std::int32_t argc, char *argv[]) {
 }
 
 
+int main(std::int32_t argc, char *argv[]) {
 
+  UnicloudMgr instance(argc, argv);
+
+
+}
 
 
 
